@@ -1,15 +1,28 @@
+# Utiliser une image Node.js
 FROM node:18-alpine
+
+# Installer les dépendances système nécessaires pour canvas
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    giflib-dev \
+    pixman-dev
+
 WORKDIR /app
 
-# Copier package.json et installer les dépendances en production
+# Copier package.json et installer les dépendances
 COPY package*.json ./
 RUN npm install --production
 
 # Copier le reste du code source
 COPY . .
 
-# Exposer le port sur lequel ton serveur écoute
+# Exposer le port de l'application
 EXPOSE 5000
 
-# Commande de lancement
-CMD ["node", "server.js"]
+# Démarrer l'application
+CMD ["npm", "start"]
