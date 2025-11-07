@@ -37,7 +37,7 @@ module.exports.updateProject=async (req,res) => {
     }
 }
 
-module.exports.deleteProject=async (res,res) => {
+module.exports.deleteProject=async (req,res) => {
     try {
        const {id} = req.params
     
