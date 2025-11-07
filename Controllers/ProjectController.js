@@ -47,7 +47,7 @@ module.exports.deleteProject=async (req,res) => {
         res.status(500).send({ message: "Internal Server Error", error });
     }
 }
-module.exports.getAllProject=async (res,res) => {
+module.exports.getAllProject=async (req,res) => {
     try {
     
       const getProject= await Project.find()
