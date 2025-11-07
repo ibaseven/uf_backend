@@ -19,7 +19,7 @@ module.exports.createProject=async(req,res)=>{
     }
 }
 
-module.exports.updateProject=async (res,res) => {
+module.exports.updateProject=async (req,res) => {
     try {
        const {id} = req.params
       const{nameProject,packPrice,duration,monthlyPayment}=req.body 
