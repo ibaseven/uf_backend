@@ -5,7 +5,7 @@ const connectDB = async()=>{
     try {
         mongoose.connect(uri)
         console.log("Connexion a la BD reusii");
-        
+        //tes
     } catch (error) {
         console.log(error);
         
