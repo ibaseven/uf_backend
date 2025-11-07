@@ -18,33 +18,33 @@ jobs:
         id: vars
         run: |
           if [ "${GITHUB_REF##*/}" == "main" ]; then
-            echo "ENV=${{ vars.PROD_ENV }}" >> $GITHUB_ENV
-            echo "TAG=${{ vars.PROD_TAG }}" >> $GITHUB_ENV
-            echo "DOMAIN=${{ vars.PROD_DOMAIN }}" >> $GITHUB_ENV
+            echo "ENV=${{ secrets.PROD_ENV }}" >> $GITHUB_ENV
+            echo "TAG=${{ secrets.PROD_TAG }}" >> $GITHUB_ENV
+            echo "DOMAIN=${{ secrets.PROD_DOMAIN }}" >> $GITHUB_ENV
             echo "REMOTE_PATH=/srv/backend/main" >> $GITHUB_ENV
           else
-            echo "ENV=${{ vars.STAGING_ENV }}" >> $GITHUB_ENV
-            echo "TAG=${{ vars.STAGING_TAG }}" >> $GITHUB_ENV
-            echo "DOMAIN=${{ vars.STAGING_DOMAIN }}" >> $GITHUB_ENV
+            echo "ENV=${{ secrets.STAGING_ENV }}" >> $GITHUB_ENV
+            echo "TAG=${{ secrets.STAGING_TAG }}" >> $GITHUB_ENV
+            echo "DOMAIN=${{ secrets.STAGING_DOMAIN }}" >> $GITHUB_ENV
             echo "REMOTE_PATH=/srv/backend/staging" >> $GITHUB_ENV
           fi
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build & Push Docker Image
         run: |
-          docker build -t ${{ vars.DOCKERHUB_USERNAME }}/backend:${{ env.TAG }} .
-          docker push ${{ vars.DOCKERHUB_USERNAME }}/backend:${{ env.TAG }}
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ env.TAG }} .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ env.TAG }}
 
       - name: Copy docker-compose.yml to server
         uses: appleboy/scp-action@master
         with:
-          host: ${{ vars.SERVER_IP }}
-          username: ${{ vars.SERVER_USER }}
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: "docker-compose.yml"
           target: "${{ env.REMOTE_PATH }}"
@@ -53,14 +53,14 @@ jobs:
       - name: Deploy Backend on Server
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ vars.SERVER_IP }}
-          username: ${{ vars.SERVER_USER }}
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
             cd ${{ env.REMOTE_PATH }}
-            docker pull ${{ vars.DOCKERHUB_USERNAME }}/backend:${{ env.TAG }}
-            export DOCKERHUB_USERNAME=${{ vars.DOCKERHUB_USERNAME }}
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ env.TAG }}
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             export TAG=${{ env.TAG }}
             export ENV=${{ env.ENV }}
             export DOMAIN=${{ env.DOMAIN }}
