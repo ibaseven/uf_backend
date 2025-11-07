@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  backend:
+    image: ${DOCKERHUB_USERNAME}/backend:${TAG}
+    networks:
+      - backend-net
+      - traefik-public
+    env_file:
+      - .env
+    deploy:
+      labels:
+        - "traefik.enable=true"
+
+        # Règle de routage dynamique selon l'environnement
+        - "traefik.http.routers.backend-${ENV}.rule=Host(`api.${DOMAIN}`)"
+        - "traefik.http.services.backend-${ENV}.loadbalancer.server.port=5000"
+        - "traefik.http.routers.backend-${ENV}.entrypoints=websecure"
+        - "traefik.http.routers.backend-${ENV}.tls=true"
+        - "traefik.http.routers.backend-${ENV}.tls.certresolver=leresolver"
+
+      replicas: 1
+      mode: replicated
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+networks:
+  backend-net:
+    driver: overlay
+  traefik-public:
+    external: true
