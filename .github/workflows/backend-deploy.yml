@@ -68,3 +68,4 @@ jobs:
             export DOMAIN=${{ env.DOMAIN }}
             docker stack deploy -c docker-compose.yml backend-${{ env.ENV }} --with-registry-auth
             docker image prune -f
+
