@@ -18,14 +18,14 @@ jobs:
         id: vars
         run: |
           if [ "${GITHUB_REF##*/}" == "main" ]; then
-            echo "ENV=${{ secrets.PROD_ENV }}" >> $GITHUB_ENV
-            echo "TAG=${{ secrets.PROD_TAG }}" >> $GITHUB_ENV
-            echo "DOMAIN=${{ secrets.PROD_DOMAIN }}" >> $GITHUB_ENV
+            echo "ENV=production" >> $GITHUB_ENV
+            echo "TAG=latest" >> $GITHUB_ENV
+            echo "DOMAIN=api.actionuniversalfab.com" >> $GITHUB_ENV
             echo "REMOTE_PATH=/srv/backend/main" >> $GITHUB_ENV
           else
-            echo "ENV=${{ secrets.STAGING_ENV }}" >> $GITHUB_ENV
-            echo "TAG=${{ secrets.STAGING_TAG }}" >> $GITHUB_ENV
-            echo "DOMAIN=${{ secrets.STAGING_DOMAIN }}" >> $GITHUB_ENV
+            echo "ENV=staging" >> $GITHUB_ENV
+            echo "TAG=staging" >> $GITHUB_ENV
+            echo "DOMAIN=api-staging.actionuniversalfab.com" >> $GITHUB_ENV
             echo "REMOTE_PATH=/srv/backend/staging" >> $GITHUB_ENV
           fi
 
@@ -62,10 +62,12 @@ jobs:
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
             cd ${{ env.REMOTE_PATH }}
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ env.TAG }}
+            
+            # Variables de déploiement
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             export TAG=${{ env.TAG }}
             export ENV=${{ env.ENV }}
             export DOMAIN=${{ env.DOMAIN }}
+            
             docker stack deploy -c docker-compose.yml backend-${{ env.ENV }} --with-registry-auth
             docker image prune -f
-

@@ -11,13 +11,26 @@ services:
     deploy:
       labels:
         - "traefik.enable=true"
-
-        # Règle de routage dynamique selon l'environnement
-        - "traefik.http.routers.backend-${ENV}.rule=Host(`api.${DOMAIN}`)"
+        - "traefik.docker.network=traefik-public"
+        
+        # Service
         - "traefik.http.services.backend-${ENV}.loadbalancer.server.port=5000"
-        - "traefik.http.routers.backend-${ENV}.entrypoints=websecure"
-        - "traefik.http.routers.backend-${ENV}.tls=true"
-        - "traefik.http.routers.backend-${ENV}.tls.certresolver=leresolver"
+        
+        # HTTPS Router
+        - "traefik.http.routers.backend-${ENV}-secure.rule=Host(`${DOMAIN}`)"
+        - "traefik.http.routers.backend-${ENV}-secure.entrypoints=websecure"
+        - "traefik.http.routers.backend-${ENV}-secure.tls=true"
+        - "traefik.http.routers.backend-${ENV}-secure.tls.certresolver=leresolver"
+        - "traefik.http.routers.backend-${ENV}-secure.service=backend-${ENV}"
+        
+        # HTTP Router avec redirection
+        - "traefik.http.routers.backend-${ENV}-http.rule=Host(`${DOMAIN}`)"
+        - "traefik.http.routers.backend-${ENV}-http.entrypoints=web"
+        - "traefik.http.routers.backend-${ENV}-http.middlewares=redirect-to-https"
+        
+        # Middleware redirect
+        - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+        - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
 
       replicas: 1
       mode: replicated
@@ -25,6 +38,10 @@ services:
         condition: on-failure
         delay: 5s
         max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
 
 networks:
   backend-net:
