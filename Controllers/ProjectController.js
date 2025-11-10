@@ -47,12 +47,20 @@ module.exports.deleteProject=async (req,res) => {
         res.status(500).send({ message: "Internal Server Error", error });
     }
 }
-module.exports.getAllProject=async (req,res) => {
-    try {
-    
-      const getProject= await Project.find()
-        return res.status(200).json({message:"Update Succesful"},getProject)
-    } catch (error) {
-        res.status(500).send({ message: "Internal Server Error", error });
-    }
-}
+module.exports.getAllProject = async (req, res) => {
+  try {
+    const projects = await Project.find();
+
+    return res.status(200).json({
+      success: true,
+      message: "Projets récupérés avec succès",
+      projects,
+    });
+  } catch (error) {
+    console.error("Erreur lors de la récupération des projets :", error);
+    return res.status(500).json({
+      message: "Erreur serveur",
+      error: error.message,
+    });
+  }
+};

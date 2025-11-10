@@ -69,7 +69,10 @@ module.exports.CreateAccount = async (req, res) => {
     // Vérifie si le numéro existe déjà en BD
     const existingUser = await User.findOne({ telephone });
     if (existingUser) {
-      return res.status(400).json({ message: "Ce numéro est déjà enregistré." });
+      return res.status(400).json({ 
+        success: false,
+        message: "Ce numéro est déjà enregistré." 
+      });
     }
 
     // Génère un OTP
@@ -92,30 +95,48 @@ module.exports.CreateAccount = async (req, res) => {
     );
 
     return res.status(200).json({
+      success: true,  // ← AJOUTÉ
+      tempUserId: telephone,  // ← AJOUTÉ (utilisé pour identifier l'utilisateur lors de la vérification)
       message: "Un code de vérification a été envoyé à votre numéro WhatsApp.",
       requireOTP: true,
     });
   } catch (error) {
     console.error("Erreur CreateAccount:", error);
-    res.status(500).json({ message: "Erreur interne du serveur", error });
+    res.status(500).json({ 
+      success: false,  // ← AJOUTÉ
+      message: "Erreur interne du serveur", 
+      error: error.message 
+    });
   }
-};module.exports.VerifyCreateAccountOTP = async (req, res) => {
+};
+module.exports.VerifyCreateAccountOTP = async (req, res) => {
   try {
-    const { telephone, otp } = req.body;
+    const { tempUserId, otpCode } = req.body;  // ← Changé "telephone" en "tempUserId" et "otp" en "otpCode"
+    
+    const telephone = tempUserId;  // tempUserId contient le numéro de téléphone
 
     // Vérifie si un OTP a été généré pour ce téléphone
     const otpData = otpStore[telephone];
     if (!otpData) {
-      return res.status(400).json({ message: "Aucun code OTP trouvé ou expiré." });
+      return res.status(400).json({ 
+        success: false,
+        message: "Aucun code OTP trouvé ou expiré." 
+      });
     }
 
     // Vérifie la validité et la correspondance du code
-    if (otpData.otp !== otp) {
-      return res.status(400).json({ message: "Code OTP incorrect." });
+    if (otpData.otp !== otpCode) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Code OTP incorrect." 
+      });
     }
     if (otpData.expiresAt < new Date()) {
       delete otpStore[telephone];
-      return res.status(400).json({ message: "Code OTP expiré." });
+      return res.status(400).json({ 
+        success: false,
+        message: "Code OTP expiré." 
+      });
     }
 
     // Hash du mot de passe avant création
@@ -129,13 +150,13 @@ module.exports.CreateAccount = async (req, res) => {
       lastName: otpData.lastName,
       password: hashedPassword,
       role: "actionnaire",
-    
     });
 
     // Nettoyage : on supprime les données temporaires
     delete otpStore[telephone];
 
     return res.status(201).json({
+      success: true,  // ← AJOUTÉ
       message: "Compte créé et vérifié avec succès 🎉",
       user: {
         id: newUser._id,
@@ -145,7 +166,11 @@ module.exports.CreateAccount = async (req, res) => {
     });
   } catch (error) {
     console.error("Erreur VerifyOTP:", error);
-    res.status(500).json({ message: "Erreur interne du serveur", error });
+    res.status(500).json({ 
+      success: false,  // ← AJOUTÉ
+      message: "Erreur interne du serveur", 
+      error: error.message 
+    });
   }
 };
 
@@ -253,7 +278,7 @@ module.exports.verifyOTPAndSignIn = async (req, res) => {
       return res.status(401).json({ message: "Code de vérification expiré" });
     }
 
-    const user = await User.findById(userId).select("-password");
+      const user = await User.findById(userId).select("_id role");
     if (!user) {
       return res.status(404).json({ message: "Utilisateur non trouvé" });
     }
@@ -268,7 +293,7 @@ module.exports.verifyOTPAndSignIn = async (req, res) => {
     res.status(200).json({ 
       message: "Connexion réussie", 
       token, 
-      //user 
+      user 
     });
   } catch (error) {
     console.error("Erreur lors de la vérification OTP:", error);
