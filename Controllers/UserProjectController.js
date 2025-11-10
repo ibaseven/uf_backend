@@ -49,6 +49,7 @@ module.exports.participateProject = async (req, res) => {
     const numberOfPacks = totalInvestment / project.packPrice;
 
     res.status(200).json({
+      success: true,
       message: "Participation enregistrée. Le paiement est attendu pour valider la participation.",
       participation: {
         projectName: project.nameProject,
@@ -62,7 +63,7 @@ module.exports.participateProject = async (req, res) => {
 
   } catch (error) {
     console.error("Erreur participation projet:", error);
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
+    res.status(500).json({success: false, message: "Erreur serveur", error: error.message });
   }
 };
 
@@ -251,4 +252,6 @@ module.exports.updateStatusPayemt = async (invoiceToken, status) => {
     };
   }
 };
+
+
 
