@@ -2,10 +2,11 @@ const express = require("express");
 const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, verifyOTPAndSignIn, VerifyCreateAccountOTP } = require("../Controllers/AuthController");
 const { participateProject, giveYourDividendToTheProject } = require("../Controllers/UserProjectController");
 const { authenticateTokenAndUserData, authenticateUser } = require("../Middlewares/VerifyToken");
-const { createProject } = require("../Controllers/ProjectController");
+const { createProject, getAllProject } = require("../Controllers/ProjectController");
 const { handlePaymentCallback, handleBuyActionsCallback } = require("../Controllers/paymentCallbackController");
 const { buyAction } = require("../Controllers/ActionController");
 const { bulkCreateUsersFromPDF, uploadPDF } = require("../utils/bulkCreateUsers");
+const { getAllTransactionsByUser } = require("../Controllers/TransactionController");
 const router = express.Router();
 
 
@@ -21,6 +22,9 @@ router.get('/getMyProfile', authenticateUser, getMyProfile);
 router.post("/buyActions",authenticateUser,buyAction)
 router.post("/bulk-create-users",uploadPDF, bulkCreateUsersFromPDF);
 router.post("/ipn",handlePaymentCallback)
+router.get("/getransactionbyuser",authenticateUser,getAllTransactionsByUser)
+router.get("/getAllProject",authenticateUser,getAllProject)
+
 router.post("/ipnpayment",handleBuyActionsCallback)
 
 module.exports=router
