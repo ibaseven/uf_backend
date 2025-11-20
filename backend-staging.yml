@@ -3,6 +3,8 @@ version: '3.8'
 services:
   backend:
     image: ibaseveni985/backend:staging
+    env_file:
+      - .env
     networks:
       - backend-net
       - traefik-public
@@ -10,26 +12,17 @@ services:
       labels:
         - "traefik.enable=true"
         - "traefik.docker.network=traefik-public"
-
-        # Service
         - "traefik.http.services.backend-staging.loadbalancer.server.port=5000"
-
-        # HTTPS Router
         - "traefik.http.routers.backend-staging-secure.rule=Host(`api-staging.actionuniversalfab.com`)"
         - "traefik.http.routers.backend-staging-secure.entrypoints=websecure"
         - "traefik.http.routers.backend-staging-secure.tls=true"
         - "traefik.http.routers.backend-staging-secure.tls.certresolver=leresolver"
         - "traefik.http.routers.backend-staging-secure.service=backend-staging"
-
-        # HTTP router + redirect
         - "traefik.http.routers.backend-staging-http.rule=Host(`api-staging.actionuniversalfab.com`)"
         - "traefik.http.routers.backend-staging-http.entrypoints=web"
         - "traefik.http.routers.backend-staging-http.middlewares=redirect-to-https"
-
-        # Middleware redirect → HTTPS
         - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
         - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
-
       replicas: 1
       restart_policy:
         condition: on-failure
