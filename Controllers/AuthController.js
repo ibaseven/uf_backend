@@ -64,7 +64,7 @@ module.exports.SignAccount= async(req,res)=>{
 }
 module.exports.CreateAccount = async (req, res) => {
   try {
-    const { telephone, firstName, lastName, password } = req.body;
+    const { telephone, firstName, lastName, password ,nationalite,ville,pays,cni,dateNaissance,adresse} = req.body;
 
     // Vérifie si le numéro existe déjà en BD
     const existingUser = await User.findOne({ telephone });
@@ -85,6 +85,12 @@ module.exports.CreateAccount = async (req, res) => {
       lastName,
       telephone,
       password,
+      nationalite,
+      ville,
+      pays,
+      cni,
+      dateNaissance,
+      adresse,
       expiresAt: new Date(Date.now() + 5 * 60 * 1000), // expire après 5 min
     };
 
@@ -95,15 +101,15 @@ module.exports.CreateAccount = async (req, res) => {
     );
 
     return res.status(200).json({
-      success: true,  // ← AJOUTÉ
-      tempUserId: telephone,  // ← AJOUTÉ (utilisé pour identifier l'utilisateur lors de la vérification)
+      success: true,
+      tempUserId: telephone, 
       message: "Un code de vérification a été envoyé à votre numéro WhatsApp.",
       requireOTP: true,
     });
   } catch (error) {
     console.error("Erreur CreateAccount:", error);
     res.status(500).json({ 
-      success: false,  // ← AJOUTÉ
+      success: false,  
       message: "Erreur interne du serveur", 
       error: error.message 
     });
@@ -217,7 +223,8 @@ module.exports.getMyProfile = async (req, res) => {
         lastName: user.lastName,
         telephone: user.telephone,
         role: user.role,
-        dividende: user.dividende
+        dividende: user.dividende,
+        actionsNumber:user.actionsNumber
       },
       statistics: {
         totalInvested,
@@ -298,5 +305,496 @@ module.exports.verifyOTPAndSignIn = async (req, res) => {
   } catch (error) {
     console.error("Erreur lors de la vérification OTP:", error);
     res.status(500).json({ message: "Erreur interne du serveur" });
+  }
+};
+
+module.exports.createAdmin = async (req, res) => {
+  try {
+    const { telephone, firstName, lastName, password, role } = req.body;
+
+    // Vérifier si le numéro existe déjà
+    const existingUser = await User.findOne({ telephone });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "Ce numéro est déjà enregistré."
+      });
+    }
+
+    // Hash du mot de passe
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Création de l'admin
+    const newAdmin = await User.create({
+      telephone,
+      firstName,
+      lastName,
+      password: hashedPassword,
+      role: role 
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Administrateur créé avec succès.",
+      user: newAdmin
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Erreur serveur."
+    });
+  }
+};
+module.exports.getAllActionnaire = async (req, res) => {
+  try {
+    const actionnaires = await User.find({ role: "actionnaire" });
+
+    return res.status(200).json({
+      success: true,
+      total: actionnaires.length,
+      actionnaires
+    });
+
+  } catch (error) {
+    console.error("Erreur getAllActionnaire:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Erreur interne du serveur",
+      error
+    });
+  }
+};
+module.exports.updateOwnProfile = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.userData?.id;
+    const { 
+      firstName, 
+      lastName, 
+      email, 
+      telephone, 
+      adresse,
+      nationalite,
+      ville,
+      pays,
+      cni,
+      dateNaissance
+    } = req.body;
+
+    // Vérifier que l'utilisateur existe
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Utilisateur non trouvé" 
+      });
+    }
+
+    // Préparer les données à mettre à jour (tous les champs modifiables)
+    let updateData = {};
+    
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (email !== undefined) {
+      // Vérifier si l'email est déjà utilisé par un autre utilisateur
+      const emailExists = await User.findOne({ 
+        email, 
+        _id: { $ne: userId } 
+      });
+      
+      if (emailExists) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Cet email est déjà utilisé par un autre utilisateur" 
+        });
+      }
+      
+      updateData.email = email;
+    }
+    if (telephone !== undefined) updateData.telephone = telephone;
+    if (adresse !== undefined) updateData.adresse = adresse;
+    if (nationalite !== undefined) updateData.nationalite = nationalite;
+    if (ville !== undefined) updateData.ville = ville;
+    if (pays !== undefined) updateData.pays = pays;
+    if (dateNaissance !== undefined) updateData.dateNaissance = dateNaissance;
+if (cni !== undefined) updateData.cni = cni;
+    // Mettre à jour l'utilisateur
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true }
+    ).select('-password');
+
+    return res.status(200).json({
+      success: true,
+      message: "Profil mis à jour avec succès",
+      user: updatedUser
+    });
+    
+  } catch (error) {
+    console.error('Erreur mise à jour profil:', error);
+    res.status(500).json({ 
+      success: false,
+      message: "Erreur interne du serveur", 
+      error: error.message 
+    });
+  }
+};
+
+module.exports.getUserById = async (req, res) => {
+    try {
+        const { id } = req.params; // ID de l'utilisateur passé en paramètre de route
+
+        // Recherchez l'utilisateur par ID en ne récupérant que certains champs
+        const user = await User.findById(id);
+
+        if (!user) {
+            return res.status(404).json({ message: 'Utilisateur non trouvé' });
+        }
+
+       
+
+        return res.status(200).json({ message: 'Utilisateur récupéré avec succès', user });
+    } catch (error) {
+        res.status(500).json({ message: 'Erreur lors de la récupération de l\'utilisateur', error: error.message });
+    }
+};
+
+module.exports.sendPasswordResetOTP = async (req, res) => {
+  try {
+    const { telephone } = req.body;
+
+    // Validation du numéro de téléphone
+    if (!telephone) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Le numéro de téléphone est requis.' 
+      });
+    }
+
+    // Vérifier si l'utilisateur existe
+    const user = await User.findOne({ telephone });
+
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Aucun utilisateur trouvé avec ce numéro de téléphone.' 
+      });
+    }
+
+    // Vérifier si l'utilisateur n'est pas bloqué
+    if (user.isBlocked) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Votre compte est bloqué. Contactez l\'administrateur.' 
+      });
+    }
+
+    // Générer un code OTP pour la réinitialisation
+    const resetOTP = generateOTP();
+
+    // Stocker l'OTP avec un délai d'expiration (10 minutes)
+    passwordResetOtpStore[user._id] = {
+      code: resetOTP,
+      telephone: telephone,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      attempts: 0 // Compteur de tentatives
+    };
+
+    // Message WhatsApp pour la réinitialisation
+    const message = `Réinitialisation de mot de passe - Dioko
+Bonjour ${user.firstName} ${user.lastName},
+Votre code de réinitialisation de mot de passe est : ${resetOTP}
+ Ce code expire dans 10 minutes.
+ Pour votre sécurité, ne partagez ce code avec personne.
+Si vous n'avez pas demandé cette réinitialisation, ignorez ce message.
+Équipe Dioko`;
+
+    // Envoyer l'OTP par WhatsApp
+    try {
+      await sendWhatsAppMessage(telephone, message);
+      
+      //(`OTP de réinitialisation envoyé à ${telephone} pour l'utilisateur ${user._id}`);
+      
+      return res.status(200).json({ 
+        success: true,
+        message: 'Un code de réinitialisation a été envoyé à votre numéro WhatsApp.',
+        userId: user._id,
+        expiresIn: '10 minutes'
+      });
+      
+    } catch (msgError) {
+      console.error("Erreur lors de l'envoi du message WhatsApp:", msgError);
+      
+      // Nettoyer le store en cas d'échec d'envoi
+      delete passwordResetOtpStore[user._id];
+      
+      return res.status(500).json({ 
+        success: false,
+        message: 'Échec de l\'envoi du code de réinitialisation. Veuillez réessayer.' 
+      });
+    }
+
+  } catch (error) {
+    console.error("Erreur lors de la demande de réinitialisation :", error);
+    return res.status(500).json({ 
+      success: false,
+      message: 'Une erreur est survenue. Veuillez réessayer.' 
+    });
+  }
+};
+module.exports.verifyOTPAndResetPassword = async (req, res) => {
+  try {
+    const { userId, otpCode, newPassword } = req.body;
+
+    // Validation des données
+    if (!userId || !otpCode || !newPassword) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Tous les champs sont requis (userId, otpCode, newPassword).' 
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Le nouveau mot de passe doit contenir au moins 6 caractères.' 
+      });
+    }
+
+    // Vérifier si l'OTP existe pour cet utilisateur
+    if (!passwordResetOtpStore[userId]) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Code de vérification invalide ou expiré.' 
+      });
+    }
+
+    const otpData = passwordResetOtpStore[userId];
+
+    // Vérifier si l'OTP n'a pas expiré
+    if (new Date() > otpData.expiresAt) {
+      delete passwordResetOtpStore[userId];
+      return res.status(401).json({ 
+        success: false,
+        message: 'Code de vérification expiré. Veuillez demander un nouveau code.' 
+      });
+    }
+
+    // Limiter le nombre de tentatives (max 3)
+    if (otpData.attempts >= 3) {
+      delete passwordResetOtpStore[userId];
+      return res.status(429).json({ 
+        success: false,
+        message: 'Trop de tentatives. Veuillez demander un nouveau code.' 
+      });
+    }
+
+    // Vérifier si le code OTP est correct
+    if (otpData.code !== otpCode) {
+      otpData.attempts += 1;
+      return res.status(401).json({ 
+        success: false,
+        message: `Code de vérification incorrect. Tentatives restantes: ${3 - otpData.attempts}` 
+      });
+    }
+
+    // Rechercher l'utilisateur dans la base de données
+    const user = await User.findById(userId);
+    if (!user) {
+      delete passwordResetOtpStore[userId];
+      return res.status(404).json({ 
+        success: false,
+        message: 'Utilisateur introuvable.' 
+      });
+    }
+
+    // Vérifier que le téléphone correspond (sécurité supplémentaire)
+    if (user.telephone !== otpData.telephone) {
+      delete passwordResetOtpStore[userId];
+      return res.status(400).json({ 
+        success: false,
+        message: 'Données de sécurité incorrectes.' 
+      });
+    }
+
+    // Vérifier que le nouveau mot de passe est différent de l'ancien
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Le nouveau mot de passe doit être différent de l\'ancien.' 
+      });
+    }
+
+    // Crypter le nouveau mot de passe
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Mettre à jour le mot de passe
+    user.password = hashedPassword;
+    await user.save();
+
+    // Nettoyer le store après succès
+    delete passwordResetOtpStore[userId];
+
+    // Message de confirmation par WhatsApp
+/*     const confirmationMessage = `✅Mot de passe réinitialisé - Dioko
+
+Bonjour ${user.firstName} ${user.lastName},
+
+Votre mot de passe a été réinitialisé avec succès.
+
+Heure : ${new Date().toLocaleString('fr-FR', { timeZone: 'Africa/Dakar' })}
+
+Si vous n'êtes pas à l'origine de cette action, contactez immédiatement l'administrateur.
+
+Équipe Dioko`;
+
+    // Envoyer la confirmation (optionnel, ne pas bloquer en cas d'erreur)
+    try {
+      await sendWhatsAppMessage(user.telephone, confirmationMessage);
+    } catch (confirmError) {
+      console.error("Erreur envoi confirmation:", confirmError);
+      // On continue même si l'envoi de confirmation échoue
+    } */
+
+    return res.status(200).json({ 
+      success: true,
+      message: 'Mot de passe réinitialisé avec succès.' 
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de la réinitialisation du mot de passe :', error);
+    return res.status(500).json({ 
+      success: false,
+      message: 'Une erreur est survenue lors de la réinitialisation.' 
+    });
+  }
+};
+
+module.exports.resendPasswordResetOTP = async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'ID utilisateur requis.' 
+      });
+    }
+
+    // Vérifier si l'utilisateur existe
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Utilisateur non trouvé.' 
+      });
+    }
+
+    // Vérifier si l'utilisateur n'est pas bloqué
+    if (user.isBlocked) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Votre compte est bloqué.' 
+      });
+    }
+
+    // Générer un nouveau code OTP
+    const resetOTP = generateOTP();
+
+    // Stocker le nouveau OTP
+    passwordResetOtpStore[user._id] = {
+      code: resetOTP,
+      telephone: user.telephone,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      attempts: 0
+    };
+
+    // Message WhatsApp
+    const message = ` Nouveau code de réinitialisation - Dioko
+Votre nouveau code de réinitialisation est : ${resetOTP}
+Ce code expire dans 10 minutes.
+Équipe Dioko`;
+
+    // Envoyer le nouveau OTP
+    try {
+      await sendWhatsAppMessage(user.telephone, message);
+      
+      return res.status(200).json({ 
+        success: true,
+        message: 'Un nouveau code de réinitialisation a été envoyé.',
+        userId: user._id
+      });
+      
+    } catch (msgError) {
+      console.error("Erreur lors de l'envoi du nouveau code:", msgError);
+      delete passwordResetOtpStore[user._id];
+      
+      return res.status(500).json({ 
+        success: false,
+        message: 'Échec de l\'envoi du nouveau code.' 
+      });
+    }
+
+  } catch (error) {
+    console.error("Erreur lors du renvoi de l'OTP:", error);
+    return res.status(500).json({ 
+      success: false,
+      message: 'Erreur interne du serveur.' 
+    });
+  }
+};
+
+// Fonction utilitaire pour nettoyer les OTPs expirés (à appeler périodiquement)
+module.exports.cleanExpiredPasswordResetOTPs = () => {
+  const now = new Date();
+  for (const userId in passwordResetOtpStore) {
+    if (passwordResetOtpStore[userId].expiresAt < now) {
+      delete passwordResetOtpStore[userId];
+    }
+  }
+};
+
+// Nettoyer les OTPs expirés toutes les 15 minutes
+setInterval(() => {
+  module.exports.cleanExpiredPasswordResetOTPs();
+}, 15 * 60 * 1000);
+
+module.exports.resetPassWord = async (req, res) => {
+  try {
+    const resetToken = req.params.resetToken;
+    const { password } = req.body;
+
+    // Vérifier si le token est valide
+    jwt.verify(resetToken, secretKey, async (err, decoded) => {
+      if (err) {
+        return res.status(400).json({ message: 'Token de réinitialisation invalide ou expiré.' });
+      }
+
+      const userId = decoded.id;
+
+      // Rechercher l'utilisateur dans la base de données
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'Utilisateur introuvable.' });
+      }
+
+      // Crypter le nouveau mot de passe
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+
+      // Mettre à jour le mot de passe
+      user.password = hashedPassword;
+      await user.save();
+
+      return res.status(200).json({ message: 'Mot de passe réinitialisé avec succès.' });
+    });
+  } catch (error) {
+    console.error('Erreur lors de la réinitialisation du mot de passe :', error);
+    return res.status(500).json({ message: 'Une erreur est survenue lors de la réinitialisation.' });
   }
 };

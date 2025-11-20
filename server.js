@@ -10,9 +10,10 @@ const app = express();
 connectDB();
 
 app.use(cors({
-  origin: '*',
+  origin: 'http://localhost:3000',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS',"PATCH"],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true // ✅ Important
 }));
 
 app.use(bodyParser.json());
