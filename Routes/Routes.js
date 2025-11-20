@@ -8,7 +8,9 @@ const { buyAction } = require("../Controllers/ActionController");
 const { bulkCreateUsersFromPDF, uploadPDF } = require("../utils/bulkCreateUsers");
 const { getAllTransactionsByUser, getAllTransactions } = require("../Controllers/TransactionController");
 const { uploadImg } = require("../Middlewares/awsUpload");
-const { previewPdfImport } = require("../utils/TESTFILE.JS");
+const { previewPdfImport } = require("../utils/test");
+
+
 const router = express.Router();
 const uploadFields = [
   { name: 'rapport', maxCount: 3 }
