@@ -109,6 +109,7 @@ const TransactionRecord = await Transaction.create({
     });
 
     res.status(200).json({
+      success:true,
       message: "Participation enregistrée et paiement déclenché. Attente de validation.",
       userId,
       updatedProjects: updatedProjects.filter(Boolean),
@@ -117,7 +118,7 @@ const TransactionRecord = await Transaction.create({
     });
   } catch (error) {
     console.error("Erreur dans giveYourDividendToTheProject:", error);
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
+    res.status(500).json({success:false, message: "Erreur serveur", error: error.message });
   }
 };
 
@@ -252,6 +253,73 @@ module.exports.updateStatusPayemt = async (invoiceToken, status) => {
     };
   }
 };
+
+module.exports.getProjectByUser = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Vérifier que l'utilisateur existe et récupérer ses projets
+    const user = await User.findById(userId).populate({
+      path:"projectId",
+      select:"nameProject packPrice monthlyPayment"
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur introuvable" });
+    }
+
+    // Les projets sont maintenant disponibles dans user.projects
+    return res.status(200).json({
+      message: "Projets récupérés avec succès",
+      projects: user.projectId || [],
+    });
+  } catch (error) {
+    console.error("Erreur dans getProjectByUser:", error);
+    return res.status(500).json({
+      message: "Erreur serveur",
+      error: error.message,
+    });
+  }
+};
+
+
+module.exports.changePassword = async (req, res) => {
+  const { telephone, currentPassword, newPassword } = req.body;
+
+  try {
+    const user = await User.findOne({ telephone });
+
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur non trouvé" });
+    }
+
+    // Vérifiez si le mot de passe actuel est correct
+    const isPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.password
+    );
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Mot de passe actuel incorrect" });
+    }
+
+    // Hash le nouveau mot de passe
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // Mettez à jour le mot de passe dans la base de données
+    user.password = hashedNewPassword;
+    await user.save();
+
+    res.status(200).json({ message: "Mot de passe mis à jour avec succès" });
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ message: "Erreur lors de la mise à jour du mot de passe" });
+  }
+};
+
+
 
 
 

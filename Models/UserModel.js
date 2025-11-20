@@ -26,6 +26,24 @@ const UserSchema = mongoose.Schema({
   numberOfPacks:{
     type:Number
 },
+nationalite: {
+      type: String,
+    },
+    ville: {
+      type: String,
+    },
+    pays: {
+      type: String,
+    },
+     cni: {
+      type: String,
+    },
+    dateNaissance: {
+      type: String,
+    },
+    adresse: {
+      type: String,
+    },
   projectPayments: [
   {
     projectId: { type: mongoose.Schema.Types.ObjectId, ref: "Project" },
@@ -47,8 +65,17 @@ const UserSchema = mongoose.Schema({
         type:Number,
         default:0
     },
+   
     //isVerified: { type: Boolean, default: false }
-
+parrain: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  parrainageBonus: {
+    type: Number,
+    default: 0
+  }
 
 })
 

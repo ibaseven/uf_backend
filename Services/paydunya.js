@@ -16,10 +16,10 @@ const createInvoice = async ({ items, totalAmount, callbackUrl }) => {
   try {
     const payload = {
       store: {
-        name: "NappyProud",
-        email: "contact@nappyproud.com",
+        name: "Dioko",
+       // email: "contact@nappyproud.com",
         phone_number: "221773878232",
-        website_url: "https://nappyproud.com"
+        //website_url: "https://nappyproud.com"
       },
        actions: {
         callback_url:callbackUrl
