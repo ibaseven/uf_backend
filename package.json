@@ -9,9 +9,11 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "aws-sdk": "^2.1692.0",
     "axios": "^1.13.1",
     "bcryptjs": "^3.0.2",
     "body-parser": "^2.2.0",
+    "client-s3": "github:aws-sdk/client-s3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
@@ -21,8 +23,10 @@
     "mongoose": "^8.19.2",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
+    "path": "^0.12.7",
     "pdf-parse": "^1.1.1",
     "pdf2json": "^4.0.0",
+    "pdfkit": "^0.17.2",
     "qs": "^6.14.0"
   }
 }

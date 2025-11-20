@@ -15,31 +15,42 @@ function formatPhoneNumber(telephone) {
   return cleaned;
 }
 module.exports.sendWhatsAppMessage=async(telephone, message) =>{
-  try {
-    // Formater le numéro de téléphone sans forcer l'indicatif
+try {
+    const accountId = process.env.LAM_ACCOUNT_ID;
+    const password = process.env.LAM_PASSWORD;
+    
+    if (!accountId || !password) {
+      throw new Error('LAM_ACCOUNT_ID et LAM_PASSWORD doivent être configurés dans .env');
+    }
+
     const formattedPhone = formatPhoneNumber(telephone);
     
-    const data = qs.stringify({
-      "token": TOKEN,
-      "to": formattedPhone, 
-      "body": message
-    });
-    
-    const config = {
-      method: 'post',
-      url: `https://api.ultramsg.com/${INSTANCE_ID}/messages/chat`,
-      headers: { 
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      data: data
+    const payload = {
+      accountid: accountId,
+      password: password,
+      sender: "Universall Fab",
+      ret_id: `dioko_${Date.now()}`,
+      priority: "2",
+      text: message,
+      to: [
+        {
+          ret_id_1: formattedPhone
+        }
+      ]
     };
     
-    const response = await axios(config);
-    //console.log(response);
+    const response = await axios.post('https://lamsms.lafricamobile.com/api', payload, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
     
-    return response.data;
+    return { success: true, response: response.data };
+    
   } catch (error) {
-    console.error("Erreur d'envoi WhatsApp:", error);
+    if (error.response) {
+      const responseText = error.response.data;
+    }
     throw error;
   }
 }

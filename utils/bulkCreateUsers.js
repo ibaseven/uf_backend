@@ -2,7 +2,7 @@ const fs = require("fs");
 const bcrypt = require("bcryptjs");
 const multer = require("multer");
 const path = require("path");
-const pdfParse = require("pdf-parse"); // ✅ Correction ici - sans .default
+const pdfParse = require("pdf-parse");
 
 const User = require("../Models/UserModel");
 const { sendWhatsAppMessage } = require("../utils/Whatsapp");
@@ -40,10 +40,25 @@ function generateRandomPassword(length = 8) {
 
 function cleanPhone(phone) {
   if (!phone) return null;
+  
+  // Enlever tous les caractères non numériques sauf le +
   let formatted = phone.toString().replace(/[^\d+]/g, "");
-  if (formatted.startsWith("+221")) return formatted;
-  if (formatted.startsWith("221")) return "+" + formatted;
+  
+  // Si déjà au bon format avec +221
+  if (formatted.startsWith("+221") && formatted.length >= 12) return formatted;
+  
+  // Si commence par 221 sans +
+  if (formatted.startsWith("221") && formatted.length >= 11) return "+" + formatted;
+  
+  // Si c'est un numéro local sénégalais (commence par 7 ou 3 et a 9 chiffres)
+  if (/^[73]\d{8}$/.test(formatted)) return "+221" + formatted;
+  
+  // Si c'est un numéro court sans indicatif (probable sénégalais)
+  if (formatted.length === 9 && !formatted.startsWith("+")) return "+221" + formatted;
+  
+  // Sinon ajouter +221 par défaut si pas d'indicatif
   if (!formatted.startsWith("+")) formatted = "+221" + formatted;
+  
   return formatted;
 }
 
@@ -52,18 +67,46 @@ function parsePdfText(text) {
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   const users = [];
 
-  const regex = /^(\d+)\s+(.+?)\s+\(\+\d{1,4}\)\s*(\d{7,15})\s+\d{2}\/\d{2}\/\d{4}\s+([\d,\.]+)$/;
+  // Format réel du PDF: IDNOM(+XXX) TELEPHONEDATE ACTIONS
+  // Exemple: 1LSI HOLDING(+221) 77359134413/03/20251,134
+  const regex = /^(\d+)(.+?)\((\+\d{1,4})\)\s*(\d{4,15})(\d{2}\/\d{2}\/\d{4})([\d,\.]+)$/;
 
   for (const line of lines) {
+    // Ignorer les lignes d'en-tête et de navigation
+    if (
+      line.includes("ID") && line.includes("Prénoms") ||
+      line.includes("Numéro de téléphone") ||
+      line.includes("Liste des actionnaires") ||
+      line.includes("Plateforme Universal Fab") ||
+      line.includes("Rechercher") ||
+      line.includes("Tableau de bord") ||
+      line.includes("backoffice.universalfabsn") ||
+      line.includes("Universal Fab Admin") ||
+      /^\d+\/\d+$/.test(line)
+    ) {
+      continue;
+    }
+
     const match = line.match(regex);
     if (match) {
-      const [, id, fullName, phone, actionsStr] = match;
-      const nameParts = fullName.trim().split(/\s+/);
+      const [, id, fullName, countryCode, phone, date, actionsStr] = match;
+      
+      // Nettoyer le nom
+      const cleanName = fullName.trim();
+      const nameParts = cleanName.split(/\s+/);
       const firstName = nameParts[0] || "";
       const lastName = nameParts.slice(1).join(" ") || "";
-      const actionsNumber = parseInt(actionsStr.replace(/[,\.]/g, ""));
-      users.push({ firstName, lastName, telephone: cleanPhone(phone), actionsNumber, dividende: 0 });
-      console.log(`✓ Trouvé: ${firstName} ${lastName} - ${cleanPhone(phone)} - ${actionsNumber} actions`);
+      
+      // Construire le numéro complet
+      const fullPhone = cleanPhone(countryCode + phone);
+      
+      // Parser le nombre d'actions
+      const actionsNumber = parseInt(actionsStr.replace(/[,\.]/g, "")) || 0;
+      
+      if (firstName && fullPhone && actionsNumber > 0) {
+        users.push({ firstName, lastName, telephone: fullPhone, actionsNumber, dividende: 0 });
+        console.log(`✓ [${id}] ${firstName} ${lastName} - ${fullPhone} - ${actionsNumber} actions`);
+      }
     }
   }
 
@@ -73,7 +116,7 @@ function parsePdfText(text) {
 // ========== EXTRACTION TEXTE PDF ==========
 async function extractPdfText(pdfPath) {
   const dataBuffer = fs.readFileSync(pdfPath);
-  const pdfData = await pdfParse(dataBuffer); // ✅ Utilisation correcte
+  const pdfData = await pdfParse(dataBuffer);
   return pdfData;
 }
 
@@ -89,7 +132,10 @@ module.exports.bulkCreateUsersFromPDF = async (req, res) => {
     const SEND_WHATSAPP = req.body.sendWhatsapp === true || req.body.sendWhatsapp === "true";
 
     if (!pdfPath || !fs.existsSync(pdfPath)) {
-      return res.status(400).json({ success: false, message: "Aucun fichier PDF fourni ou fichier introuvable." });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Aucun fichier PDF fourni ou fichier introuvable." 
+      });
     }
 
     console.log("📖 Lecture du fichier PDF...");
@@ -97,10 +143,14 @@ module.exports.bulkCreateUsersFromPDF = async (req, res) => {
 
     if (!pdfData.text || pdfData.text.trim().length === 0) {
       fs.unlinkSync(pdfPath);
-      return res.status(400).json({ success: false, message: "Impossible d'extraire le texte du PDF." });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Impossible d'extraire le texte du PDF." 
+      });
     }
 
     const users = parsePdfText(pdfData.text);
+    
     if (!users.length) {
       fs.unlinkSync(pdfPath);
       return res.status(400).json({
@@ -111,19 +161,27 @@ module.exports.bulkCreateUsersFromPDF = async (req, res) => {
       });
     }
 
-    console.log(`👥 ${users.length} utilisateurs détectés`);
+    console.log(`\n👥 Traitement de ${users.length} utilisateurs...`);
 
     let created = 0, skipped = 0, errors = [];
 
     for (const u of users) {
       try {
+        // Vérifier si l'utilisateur existe déjà
         const exists = await User.findOne({ telephone: u.telephone });
-        if (exists) { skipped++; continue; }
+        
+        if (exists) {
+          console.log(`⏭️  [${u.id}] ${u.firstName} ${u.lastName} existe déjà`);
+          skipped++;
+          continue;
+        }
 
+        // Générer un mot de passe aléatoire
         const password = generateRandomPassword(8);
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
+        // Créer le nouvel utilisateur
         const newUser = await User.create({
           firstName: u.firstName,
           lastName: u.lastName,
@@ -135,35 +193,66 @@ module.exports.bulkCreateUsersFromPDF = async (req, res) => {
         });
 
         created++;
+        console.log(`✅ [${u.id}] ${newUser.firstName} ${newUser.lastName} créé avec succès`);
 
+        // Envoyer le message WhatsApp si activé
         if (SEND_WHATSAPP) {
           try {
             await sendWhatsAppMessage(
               newUser.telephone,
-              `👋 Bonjour ${newUser.firstName},\n\nVotre compte Dioko a été créé.\n📱 Identifiant : ${newUser.telephone}\n🔐 Mot de passe : ${password}`
+              `Bonjour ${newUser.firstName},\n\nVotre compte Dioko a été créé.\n📱 Identifiant : ${newUser.telephone}\n🔐 Mot de passe : ${password}\n\nBienvenue sur Universal Fab! Vous Pouvez y acceder en cliquant sur le lien suivant https://actionuniversalfab.com`
             );
+            console.log(`📱 WhatsApp envoyé à ${newUser.telephone}`);
           } catch (msgErr) {
-            console.error(`❌ WhatsApp KO:`, msgErr.message);
-            errors.push({ telephone: newUser.telephone, type: "whatsapp", error: msgErr.message });
+            console.error(`❌ WhatsApp KO pour ${newUser.telephone}:`, msgErr.message);
+            errors.push({ 
+              id: u.id,
+              telephone: newUser.telephone, 
+              type: "whatsapp", 
+              error: msgErr.message 
+            });
           }
         }
       } catch (err) {
-        console.error("❌ Erreur création:", err.message);
-        errors.push({ user: `${u.firstName} ${u.lastName}`, type: "creation", error: err.message });
+        console.error(`❌ Erreur création [${u.id}] ${u.firstName} ${u.lastName}:`, err.message);
+        errors.push({ 
+          id: u.id,
+          user: `${u.firstName} ${u.lastName}`,
+          telephone: u.telephone,
+          type: "creation", 
+          error: err.message 
+        });
       }
     }
 
+    // Supprimer le fichier PDF uploadé
     if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
+
+    console.log("\n📊 RÉSUMÉ:");
+    console.log(`   Total détecté: ${users.length}`);
+    console.log(`   ✅ Créés: ${created}`);
+    console.log(`   ⏭️  Ignorés (déjà existants): ${skipped}`);
+    console.log(`   ❌ Erreurs: ${errors.length}`);
 
     return res.status(201).json({
       success: true,
       message: "Traitement terminé ✅",
-      data: { total: users.length, created, skipped, failed: errors.length },
+      data: { 
+        total: users.length, 
+        created, 
+        skipped, 
+        failed: errors.length 
+      },
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {
     console.error("💥 Erreur complète:", error);
     if (pdfPath && fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
-    return res.status(500).json({ success: false, message: "Erreur serveur", error: error.message });
+    
+    return res.status(500).json({ 
+      success: false, 
+      message: "Erreur serveur", 
+      error: error.message 
+    });
   }
 };
