@@ -9,12 +9,26 @@ const routes = require("./Routes/Routes");
 const app = express();
 connectDB();
 
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://staging-client.actionuniversalfab.com',
+  'https://actionuniversalfab.com'
+];
+
 app.use(cors({
-  origin: 'http://localhost:3000',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS',"PATCH"],
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS: " + origin));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true // ✅ Important
+  credentials: true
 }));
+
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
