@@ -5,6 +5,7 @@ const callbackurl = process.env.BACKEND_URL;
 const Transactions = require("../Models/TransactionModel");
 const { generateContractPDF, uploadPDFToS3 } = require("../utils/generatedPdf");
 const { sendWhatsAppMessage } = require("../utils/Whatsapp");
+const Settings = require("../Models/SettingsModel")
 /* module.exports.buyAction = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -210,8 +211,11 @@ module.exports.buyAction = async (req, res) => {
         await user.save();
       }
     }
-    const pricePerAction = 20;
-    const totalPrice = pricePerAction * actionNumber;
+    const settings = await Settings.findOne();
+const pricePerAction = settings.pricePerAction;
+
+
+const totalPrice = pricePerAction * actionNumber;
 
     // 4️⃣ Création de la facture
     const items = [
