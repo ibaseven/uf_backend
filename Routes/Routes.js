@@ -37,7 +37,7 @@ router.get("/getAllTransactions",authenticateUser,getAllTransactions)
 router.post('/bulk-import', uploadPDF, previewPdfImport);
 router.post("/ipnpayment",handleBuyActionsCallback)
 router.post("/createAdmin",createAdmin)
-router.get("/get-user/:id",getUserById);
+router.get("/get-user/:id",authenticateUser,getUserById);
 router.put('/updateProfile', authenticateUser, updateOwnProfile);
 router.post('/request-password-reset', sendPasswordResetOTP);
 router.post('/verify-reset-otp', verifyOTPAndResetPassword);
