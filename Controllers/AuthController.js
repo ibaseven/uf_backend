@@ -44,7 +44,7 @@ module.exports.SignAccount= async(req,res)=>{
       //(`📤 Envoi du code OTP par WhatsApp à ${user.telephone}`);
       await sendWhatsAppMessage(
         user.telephone,
-        `Votre code de vérification Dioko est: ${otp}. Il expire dans 5 minutes.`
+        `Votre code de vérification Universall Fab est: ${otp}. Il expire dans 5 minutes.`
       );
 
       //("✅ OTP envoyé avec succès");
@@ -97,7 +97,7 @@ module.exports.CreateAccount = async (req, res) => {
     // Envoie le code par WhatsApp
     await sendWhatsAppMessage(
       telephone,
-      `🔐 Votre code de vérification Dioko est : ${otp}. Il expire dans 5 minutes.`
+      `Votre code de vérification Universall Fab est : ${otp}. Il expire dans 5 minutes.`
     );
 
     return res.status(200).json({
@@ -449,6 +449,7 @@ module.exports.getUserById = async (req, res) => {
 
         // Recherchez l'utilisateur par ID en ne récupérant que certains champs
         const user = await User.findById(id);
+//console.log(user);
 
         if (!user) {
             return res.status(404).json({ message: 'Utilisateur non trouvé' });
@@ -504,13 +505,13 @@ module.exports.sendPasswordResetOTP = async (req, res) => {
     };
 
     // Message WhatsApp pour la réinitialisation
-    const message = `Réinitialisation de mot de passe - Dioko
+    const message = `Réinitialisation de mot de passe - Universall Fab
 Bonjour ${user.firstName} ${user.lastName},
 Votre code de réinitialisation de mot de passe est : ${resetOTP}
  Ce code expire dans 10 minutes.
  Pour votre sécurité, ne partagez ce code avec personne.
 Si vous n'avez pas demandé cette réinitialisation, ignorez ce message.
-Équipe Dioko`;
+Équipe Universall Fab`;
 
     // Envoyer l'OTP par WhatsApp
     try {
@@ -715,10 +716,10 @@ module.exports.resendPasswordResetOTP = async (req, res) => {
     };
 
     // Message WhatsApp
-    const message = ` Nouveau code de réinitialisation - Dioko
+    const message = ` Nouveau code de réinitialisation - Universall Fab
 Votre nouveau code de réinitialisation est : ${resetOTP}
 Ce code expire dans 10 minutes.
-Équipe Dioko`;
+Équipe Universall Fab`;
 
     // Envoyer le nouveau OTP
     try {

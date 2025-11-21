@@ -89,13 +89,13 @@ const generateContractPDF = async (purchaseData, userData) => {
         doc.moveDown(2);
       }
 
-      // === CRÉATION DU LOGO TEXTE DIOKO EN CAS D'ABSENCE ===
+      // === CRÉATION DU LOGO TEXTE Universall Fab EN CAS D'ABSENCE ===
       if (!logoAdded) {
         // Créer un logo texte stylisé
         doc.fontSize(20)
            .font('Helvetica-Bold')
            .fillColor('#2196F3') // Couleur bleue
-           .text('DIOKO', { align: 'center' })
+           .text('Universall Fab', { align: 'center' })
            .fillColor('black') // Retour au noir pour le reste
            .moveDown(1);
       }
@@ -116,7 +116,7 @@ const generateContractPDF = async (purchaseData, userData) => {
       doc.font('Helvetica')
          .text('la société ', { continued: true })
          .font('Helvetica-Bold')
-         .text('DIOKO GROUP SAS', { continued: true })
+         .text('Universall Fab ', { continued: true })
          .font('Helvetica')
          .text(', société par actions simplifiée au capital de ', { continued: true })
          .font('Helvetica-Bold')
@@ -180,7 +180,7 @@ const generateContractPDF = async (purchaseData, userData) => {
          .font('Helvetica')
          .text('Le présent contrat porte sur des actions de la société ', { continued: true })
          .font('Helvetica-Bold')
-         .text('DIOKO GROUP SAS', { continued: true })
+         .text('Universall Fab', { continued: true })
          .font('Helvetica')
          .text(', société par actions simplifiée au capital de ', { continued: true })
          .font('Helvetica-Bold')
@@ -241,7 +241,7 @@ const generateContractPDF = async (purchaseData, userData) => {
 
       doc.fontSize(11)
          .font('Helvetica')
-         .text('Le présent contrat porte sur des actions de la société DIOKO GROUP SAS, société par actions simplifiée au capital de 1 000 000 FCFA, dont le siège social est situé à Sacré-Cœur 03 TF 21 926 / DG LOT N°137, Dakar - Sénégal, immatriculée au Registre du Commerce et des Sociétés de Dakar sous le numéro 010840446 - RC : SN.DKR.2023.B.52045, représentée par Monsieur Ibrahima Diakhaté, en sa qualité de Directeur Général cède et transporte par les présentes, sous les garanties ordinaires de fait et de droit, à Monsieur ', { continued: true })
+         .text('Le présent contrat porte sur des actions de la société Universall Fab , société par actions simplifiée au capital de 1 000 000 FCFA, dont le siège social est situé à Sacré-Cœur 03 TF 21 926 / DG LOT N°137, Dakar - Sénégal, immatriculée au Registre du Commerce et des Sociétés de Dakar sous le numéro 010840446 - RC : SN.DKR.2023.B.52045, représentée par Monsieur Ibrahima Diakhaté, en sa qualité de Directeur Général cède et transporte par les présentes, sous les garanties ordinaires de fait et de droit, à Monsieur ', { continued: true })
          .font('Helvetica-Bold')
          .text(`${fullName}`, { continued: true })
          .font('Helvetica')
@@ -249,7 +249,7 @@ const generateContractPDF = async (purchaseData, userData) => {
          .font('Helvetica-Bold')
          .text(`${formatMontant(nombreActionsAchat)} actions`, { continued: true })
          .font('Helvetica')
-         .text(' lui appartenant dans la société DIOKO GROUP SAS, soit ', { continued: true })
+         .text(' lui appartenant dans la société Universall Fab , soit ', { continued: true })
          .font('Helvetica-Bold')
          .text(`${pourcentageAchat}%`, { continued: true })
          .font('Helvetica')
@@ -365,7 +365,7 @@ const generateContractPDF = async (purchaseData, userData) => {
          .moveDown(1);
 
       // Zone signature du cédant
-      doc.text('LA SOCIÉTÉ DIOKO GROUP SAS :')
+      doc.text('LA SOCIÉTÉ Universall Fab GROUP SAS :')
          .moveDown(0.3);
       
       doc.text('Monsieur Ibrahima Diakhaté')
