@@ -1,7 +1,7 @@
 const express = require("express");
 const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, verifyOTPAndSignIn, VerifyCreateAccountOTP, createAdmin, getAllActionnaire, getUserById, sendPasswordResetOTP, verifyOTPAndResetPassword, resendPasswordResetOTP, resetPassWord, updateOwnProfile } = require("../Controllers/AuthController");
 const { participateProject, giveYourDividendToTheProject, getProjectByUser, changePassword } = require("../Controllers/UserProjectController");
-const { authenticateTokenAndUserData, authenticateUser } = require("../Middlewares/VerifyToken");
+const { authenticateTokenAndUserData, authenticateUser, adminRole } = require("../Middlewares/VerifyToken");
 const { createProject, getAllProject } = require("../Controllers/ProjectController");
 const { handlePaymentCallback, handleBuyActionsCallback } = require("../Controllers/paymentCallbackController");
 const { buyAction } = require("../Controllers/ActionController");
@@ -9,6 +9,7 @@ const { bulkCreateUsersFromPDF, uploadPDF } = require("../utils/bulkCreateUsers"
 const { getAllTransactionsByUser, getAllTransactions } = require("../Controllers/TransactionController");
 const { uploadImg } = require("../Middlewares/awsUpload");
 const { previewPdfImport } = require("../utils/test");
+const { updateActionPrice, getActionPrice } = require("../Controllers/SettingsController");
 
 
 const router = express.Router();
@@ -43,4 +44,7 @@ router.post('/request-password-reset', sendPasswordResetOTP);
 router.post('/verify-reset-otp', verifyOTPAndResetPassword);
 router.post('/resend-reset-otp', resendPasswordResetOTP);
 router.post("/reset-password/:resetToken", resetPassWord);
+router.put("/action/price", adminRole,updateActionPrice);
+router.get("/action/getPrice",getActionPrice);
+
 module.exports=router
