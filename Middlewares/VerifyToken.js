@@ -55,18 +55,19 @@ const authenticateUser = (req, res, next) => {
 
 // Middleware pour vérifier l'auth et le token JWT et recupérer  les informations de l'utlisateur connecté 
 const adminRole = (req, res, next) => {
-    const token = req.headers.authorization
+    let token = req.headers.authorization;
     
     if (!token) {
         return res.status(403).send({ message: 'middleware.admin.forbidden' });
     }
-
+    if (token.startsWith('Bearer ')) {
+        token = token.substring(7);
+    }
     jwt.verify(token, secretKey, (err, decoded) => {
         if (err) {
             return res.status(403).send({ message: 'middleware.admin.invalidToken' });
         }
-
-        if (decoded.data.role !== "admin") {
+        if (decoded.data.role !== "universalLab_Admin") {
             return res.status(403).send({ message: 'middleware.admin.accessDenied' });
         }
         req.user = decoded.data;
