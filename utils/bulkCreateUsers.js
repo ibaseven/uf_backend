@@ -200,7 +200,9 @@ module.exports.bulkCreateUsersFromPDF = async (req, res) => {
           try {
             await sendWhatsAppMessage(
               newUser.telephone,
-              `Bonjour ${newUser.firstName},\n\nVotre compte Dioko a été créé.\n📱 Identifiant : ${newUser.telephone}\n🔐 Mot de passe : ${password}\n\nBienvenue sur Universal Fab! Vous Pouvez y acceder en cliquant sur le lien suivant https://actionuniversalfab.com`
+              `Bonjour ${newUser.firstName},Votre compte Universall Fab a été créé.
+               Identifiant : ${newUser.telephone} Mot de passe : ${password}
+              Bienvenue sur Universal Fab! Vous Pouvez y acceder en cliquant sur le lien suivant https://actionuniversalfab.com`
             );
             console.log(`📱 WhatsApp envoyé à ${newUser.telephone}`);
           } catch (msgErr) {

@@ -1,5 +1,5 @@
 const express = require("express");
-const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, verifyOTPAndSignIn, VerifyCreateAccountOTP, createAdmin, getAllActionnaire, getUserById, sendPasswordResetOTP, verifyOTPAndResetPassword, resendPasswordResetOTP, resetPassWord } = require("../Controllers/AuthController");
+const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, verifyOTPAndSignIn, VerifyCreateAccountOTP, createAdmin, getAllActionnaire, getUserById, sendPasswordResetOTP, verifyOTPAndResetPassword, resendPasswordResetOTP, resetPassWord, updateOwnProfile } = require("../Controllers/AuthController");
 const { participateProject, giveYourDividendToTheProject, getProjectByUser, changePassword } = require("../Controllers/UserProjectController");
 const { authenticateTokenAndUserData, authenticateUser } = require("../Middlewares/VerifyToken");
 const { createProject, getAllProject } = require("../Controllers/ProjectController");
@@ -37,8 +37,8 @@ router.get("/getAllTransactions",authenticateUser,getAllTransactions)
 router.post('/bulk-import', uploadPDF, previewPdfImport);
 router.post("/ipnpayment",handleBuyActionsCallback)
 router.post("/createAdmin",createAdmin)
-router.get("/get-user/:id", authenticateUser,getUserById);
-
+router.get("/get-user/:id",getUserById);
+router.put('/updateProfile', authenticateUser, updateOwnProfile);
 router.post('/request-password-reset', sendPasswordResetOTP);
 router.post('/verify-reset-otp', verifyOTPAndResetPassword);
 router.post('/resend-reset-otp', resendPasswordResetOTP);
