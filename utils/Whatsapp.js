@@ -44,6 +44,7 @@ try {
         'Content-Type': 'application/json'
       }
     });
+    //console.log(response);
     
     return { success: true, response: response.data };
     
