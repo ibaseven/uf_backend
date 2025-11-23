@@ -1,5 +1,5 @@
 const express = require("express");
-const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, verifyOTPAndSignIn, VerifyCreateAccountOTP, createAdmin, getAllActionnaire, getUserById, sendPasswordResetOTP, verifyOTPAndResetPassword, resendPasswordResetOTP, resetPassWord, updateOwnProfile } = require("../Controllers/AuthController");
+const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, verifyOTPAndSignIn, VerifyCreateAccountOTP, createAdmin, getAllActionnaire, getUserById, sendPasswordResetOTP, verifyOTPAndResetPassword, resendPasswordResetOTP, resetPassWord, updateOwnProfile, updateUser } = require("../Controllers/AuthController");
 const { participateProject, giveYourDividendToTheProject, getProjectByUser, changePassword } = require("../Controllers/UserProjectController");
 const { authenticateTokenAndUserData, authenticateUser, adminRole } = require("../Middlewares/VerifyToken");
 const { createProject, getAllProject } = require("../Controllers/ProjectController");
@@ -46,5 +46,5 @@ router.post('/resend-reset-otp', resendPasswordResetOTP);
 router.post("/reset-password/:resetToken", resetPassWord);
 router.put("/action/price", adminRole,updateActionPrice);
 router.get("/action/getPrice",getActionPrice);
-
+router.put('/admin/users/:userId', authenticateUser, adminRole, updateUser);
 module.exports=router

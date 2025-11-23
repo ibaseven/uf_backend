@@ -124,19 +124,19 @@ const generateContractPDF = async (purchaseData, userData) => {
          .font('Helvetica')
          .text(', dont le siège social est situé à ', { continued: true })
          .font('Helvetica-Bold')
-         .text('Sacré-Cœur 03 TF 21 926 / DG LOT N°137, Dakar - Sénégal', { continued: true })
+         .text('Thies - Tivaouane  - Sénégal', { continued: true })
          .font('Helvetica')
          .text(', immatriculée au Registre du Commerce et des Sociétés de Dakar sous le numéro ', { continued: true })
          .font('Helvetica-Bold')
-         .text('010840446', { continued: true })
+         .text('011238484', { continued: true })
          .font('Helvetica')
          .text(' - RC : ', { continued: true })
          .font('Helvetica-Bold')
-         .text('SN.DKR.2023.B.52045', { continued: true })
+         .text('SNTHS2024A2422', { continued: true })
          .font('Helvetica')
          .text(', représentée par ', { continued: true })
          .font('Helvetica-Bold')
-         .text('Monsieur Ibrahima Diakhaté', { continued: true })
+         .text('Monsieur Magate Mbaye', { continued: true })
          .font('Helvetica')
          .text(', en sa qualité de ', { continued: true })
          .font('Helvetica-Bold')
@@ -188,19 +188,19 @@ const generateContractPDF = async (purchaseData, userData) => {
          .font('Helvetica')
          .text(', dont le siège social est situé à ', { continued: true })
          .font('Helvetica-Bold')
-         .text('Sacré-Cœur 03 TF 21 926 / DG LOT N°137, Dakar - Sénégal', { continued: true })
+         .text('Thies - Tivaouane  - Sénégal', { continued: true })
          .font('Helvetica')
          .text(', immatriculée au Registre du Commerce et des Sociétés de Dakar sous le numéro ', { continued: true })
          .font('Helvetica-Bold')
-         .text('010840446', { continued: true })
+         .text('011238484', { continued: true })
          .font('Helvetica')
          .text(' - RC : ', { continued: true })
          .font('Helvetica-Bold')
-         .text('SN.DKR.2023.B.52045', { continued: true })
+         .text('SNTHS2024A2422', { continued: true })
          .font('Helvetica')
          .text(', représentée par ', { continued: true })
          .font('Helvetica-Bold')
-         .text('Monsieur Ibrahima Diakhaté', { continued: true })
+         .text('Monsieur Magate Mbaye', { continued: true })
          .font('Helvetica')
          .text(', en sa qualité de ', { continued: true })
          .font('Helvetica-Bold')
@@ -241,7 +241,7 @@ const generateContractPDF = async (purchaseData, userData) => {
 
       doc.fontSize(11)
          .font('Helvetica')
-         .text('Le présent contrat porte sur des actions de la société Universall Fab , société par actions simplifiée au capital de 1 000 000 FCFA, dont le siège social est situé à Sacré-Cœur 03 TF 21 926 / DG LOT N°137, Dakar - Sénégal, immatriculée au Registre du Commerce et des Sociétés de Dakar sous le numéro 010840446 - RC : SN.DKR.2023.B.52045, représentée par Monsieur Ibrahima Diakhaté, en sa qualité de Directeur Général cède et transporte par les présentes, sous les garanties ordinaires de fait et de droit, à Monsieur ', { continued: true })
+         .text('Le présent contrat porte sur des actions de la société Universall Fab , société par actions simplifiée au capital de 1 000 000 FCFA,dont le siège social est situé à Thies - Tivaouone  - Sénégal,immatriculée au Registre du Commerce et des Sociétés de Dakar sous le numéro 011238484 -RC: SNTHS2024A2422, représentée par Monsieur MAGATE MBAYE, en sa qualité de Directeur Général cède et transporte par les présentes, sous les garanties ordinaires de fait et de droit, à Monsieur ', { continued: true })
          .font('Helvetica-Bold')
          .text(`${fullName}`, { continued: true })
          .font('Helvetica')
@@ -368,18 +368,18 @@ const generateContractPDF = async (purchaseData, userData) => {
       doc.text('LA SOCIÉTÉ Universall Fab GROUP SAS :')
          .moveDown(0.3);
       
-      doc.text('Monsieur Ibrahima Diakhaté')
+      doc.text('Monsieur Magate Mbaye')
          .text('Directeur Général')
          .moveDown(0.5);
 
       // === GESTION DE LA SIGNATURE ===
-      const signaturePath = path.join(__dirname, '../assets/CACHET DIOKO.png');
+      const signaturePath = path.join(__dirname, '../assets/SIGNATURE UNIVERS FAB.png');
       let signatureAdded = false;
       
       try {
         // Vérifier plusieurs formats possibles
         const possibleSignaturePaths = [
-          path.join(__dirname, '../assets/CACHET DIOKO.png'),
+          path.join(__dirname, '../assets/SIGNATURE UNIVERS FAB.png'),
           path.join(__dirname, '../assets/signature_dg.jpg'),
           path.join(__dirname, '../assets/signature_dg.jpeg'),
           path.join(__dirname, '../assets/signature.png'),
