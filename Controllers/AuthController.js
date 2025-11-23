@@ -154,7 +154,14 @@ module.exports.VerifyCreateAccountOTP = async (req, res) => {
       telephone: otpData.telephone,
       firstName: otpData.firstName,
       lastName: otpData.lastName,
+      nationalite: otpData.nationalite,
+      adresse:otpData.adresse,
+      ville:otpData.ville,
+      pays:otpData.pays,
+      cni:otpData.cni,
       password: hashedPassword,
+      dateNaissance:otpData.dateNaissance,
+      nationalite:otpData.nationalite,
       role: "actionnaire",
     });
 
@@ -797,5 +804,69 @@ module.exports.resetPassWord = async (req, res) => {
   } catch (error) {
     console.error('Erreur lors de la réinitialisation du mot de passe :', error);
     return res.status(500).json({ message: 'Une erreur est survenue lors de la réinitialisation.' });
+  }
+};
+
+
+module.exports.updateUser = async (req, res) => {
+  try {
+    // Vérification admin
+    const adminId = req.user?.id || req.userData?.id;
+    const adminUser = await User.findById(adminId);
+
+   
+
+    const { userId } = req.params;
+    const updateFields = req.body;
+
+    // Un admin ne peut pas modifier son propre rôle
+    if (updateFields.role && updateFields.role !== "universalLab_Admin" && userId === adminId) {
+      return res.status(400).json({
+        success: false,
+        message: "Un administrateur ne peut pas modifier son propre rôle."
+      });
+    }
+
+    // Un admin ne peut pas se bloquer lui-même
+    if (updateFields.isBlocked === true && userId === adminId) {
+      return res.status(400).json({
+        success: false,
+        message: "Un administrateur ne peut pas se bloquer lui-même."
+      });
+    }
+
+    // Vérifier si l'utilisateur existe
+    const existingUser = await User.findById(userId);
+    if (!existingUser) {
+      return res.status(404).json({
+        success: false,
+        message: "Utilisateur non trouvé"
+      });
+    }
+
+    // Étendre tous les champs envoyés
+    let updateData = { ...updateFields };
+
+ 
+    // Mise à jour finale
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true }
+    ).select("-password");
+
+    return res.status(200).json({
+      success: true,
+      message: "Utilisateur mis à jour avec succès",
+      user: updatedUser
+    });
+
+  } catch (error) {
+    console.error("Erreur mise à jour utilisateur:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur interne du serveur",
+      error: error.message
+    });
   }
 };
