@@ -2,8 +2,9 @@ const User = require("../Models/UserModel");
 const Project = require("../Models/ProjectModel");
 const { createInvoice } = require("../Services/paydunya");
 const Transaction = require("../Models/TransactionModel");
-
+const MAIN_ADMIN_ID = process.env.MAIN_ADMIN_ID
 const callbackurl=process.env.BACKEND_URL
+const mongoose = require('mongoose');
 module.exports.participateProject = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -121,137 +122,175 @@ const TransactionRecord = await Transaction.create({
     res.status(500).json({success:false, message: "Erreur serveur", error: error.message });
   }
 };
-
 module.exports.updateStatusPayemt = async (invoiceToken, status) => {
-  try {
-    // Chercher la transaction
-    const transaction = await Transaction.findOne({ invoiceToken });
-    if (!transaction) {
-      return { 
-        error: true, 
-        statusCode: 404, 
-        message: "Transaction introuvable." 
-      };
-    }
-
-    // Vérifier si déjà traitée
-    if (transaction.status === "confirmed") {
-      return { 
-        error: true, 
-        statusCode: 200, 
-        message: "Transaction déjà traitée", 
-        transaction 
-      };
-    }
-
-    // Vérifier le statut du paiement
-    if (status !== "completed") {
-      transaction.status = "failed";
-      await transaction.save();
-      return { 
-        error: true, 
-        statusCode: 400, 
-        message: "Paiement non validé.",
-        transaction 
-      };
-    }
-
-    // Récupérer l'utilisateur
-    const user = await User.findById(transaction.userId);
-    if (!user) {
-      return { 
-        error: true, 
-        statusCode: 404, 
-        message: "Utilisateur introuvable." 
-      };
-    }
-
-    // Répartir le montant entre les projets
-    const perProjectAmount = Math.floor(transaction.amount / transaction.projectIds.length);
-
-    for (const projectId of transaction.projectIds) {
-      const project = await Project.findById(projectId);
-      if (!project) continue;
-
-      let participation = user.projectPayments?.find(
-        (p) => p.projectId.toString() === projectId.toString()
-      );
-
-      if (!participation) {
-        participation = {
-          projectId,
-          amountPaid: 0,
-          remainingToPay: project.packPrice,
-          completed: false
+    const session = await mongoose.startSession();
+    
+    try {
+        session.startTransaction();
+        
+        // Verrou atomique
+        const transaction = await Transaction.findOneAndUpdate(
+            { 
+                invoiceToken,
+                status: { $ne: 'confirmed' }
+            },
+            {
+                $set: { lastUpdateAttempt: new Date() }
+            },
+            {
+                new: false,
+                session
+            }
+        );
+        
+        if (!transaction) {
+            const existing = await Transaction.findOne({ invoiceToken }).session(session);
+            
+            if (!existing) {
+                await session.abortTransaction();
+                return {
+                    error: true,
+                    statusCode: 404,
+                    message: "Transaction introuvable"
+                };
+            }
+            
+            if (existing.status === 'confirmed') {
+                await session.abortTransaction();
+                return {
+                    error: true,
+                    statusCode: 200,
+                    message: "Transaction déjà traitée"
+                };
+            }
+            
+            await session.abortTransaction();
+            return {
+                error: true,
+                statusCode: 500,
+                message: "Impossible de verrouiller"
+            };
+        }
+        
+        if (status !== 'completed') {
+            transaction.status = 'failed';
+            await transaction.save({ session });
+            await session.commitTransaction();
+            
+            return {
+                error: true,
+                statusCode: 400,
+                message: "Paiement non validé"
+            };
+        }
+        
+        const user = await User.findById(transaction.userId).session(session);
+        if (!user) {
+            await session.abortTransaction();
+            return {
+                error: true,
+                statusCode: 404,
+                message: "Utilisateur introuvable"
+            };
+        }
+        
+        // Calculs en centimes
+        const totalAmountCents = Math.round((transaction.amount || 0) * 100);
+        const projectCount = transaction.projectIds?.length || 1;
+        const perProjectAmountCents = Math.floor(totalAmountCents / projectCount);
+        
+        // ✅ Commission automatique (6% déduit, 94% pour l'admin)
+        const adminShareCents = Math.round(totalAmountCents * 0.94);
+        
+        // Traitement des projets
+        for (const projectId of transaction.projectIds) {
+            const project = await Project.findById(projectId).session(session);
+            if (!project) continue;
+            
+            let participation = user.projectPayments?.find(
+                p => p.projectId.toString() === projectId.toString()
+            );
+            
+            if (!participation) {
+                const packPriceCents = Math.round((project.packPrice || 0) * 100);
+                participation = {
+                    projectId,
+                    amountPaid: 0,
+                    remainingToPay: packPriceCents / 100,
+                    completed: false
+                };
+                user.projectPayments = [...(user.projectPayments || []), participation];
+            }
+            
+            if (participation.completed) continue;
+            
+            const amountPaidCents = Math.round((participation.amountPaid || 0) * 100);
+            const remainingCents = Math.round((participation.remainingToPay || 0) * 100);
+            
+            const newAmountPaidCents = amountPaidCents + perProjectAmountCents;
+            const newRemainingCents = Math.max(remainingCents - perProjectAmountCents, 0);
+            
+            participation.amountPaid = newAmountPaidCents / 100;
+            participation.remainingToPay = newRemainingCents / 100;
+            participation.completed = (newRemainingCents === 0);
+            
+            const projectDividendsCents = Math.round((project.dividends || 0) * 100);
+            project.dividends = (projectDividendsCents + perProjectAmountCents) / 100;
+            await project.save({ session });
+        }
+        
+        await user.save({ session });
+        
+        const MAIN_ADMIN_ID = process.env.MAIN_ADMIN_ID;
+        
+        if (MAIN_ADMIN_ID && mongoose.Types.ObjectId.isValid(MAIN_ADMIN_ID)) {
+            const mainAdmin = await User.findById(MAIN_ADMIN_ID).session(session);
+            if (mainAdmin) {
+                const adminDividendeCents = Math.round((mainAdmin.dividende || 0) * 100);
+                mainAdmin.dividende = (adminDividendeCents + adminShareCents) / 100;
+                await mainAdmin.save({ session });
+            }
+        }
+        
+        transaction.status = 'confirmed';
+        await transaction.save({ session });
+        
+        await session.commitTransaction();
+        
+        await user.populate('projectPayments.projectId', 'nameProject packPrice');
+        
+        const projectsStatus = user.projectPayments.map(p => ({
+            projectId: p.projectId?._id,
+            nameProject: p.projectId?.nameProject || "Projet",
+            amountPaid: p.amountPaid,
+            remainingToPay: p.remainingToPay,
+            completed: p.completed
+        }));
+        
+        return {
+            error: false,
+            message: "Paiement confirmé",
+            transaction,
+            user,
+            projectsStatus
         };
-        user.projectPayments = [...(user.projectPayments || []), participation];
-      }
-
-      // ✅ Ignorer si déjà complété
-      if (participation.completed) continue;
-
-      // ✅ Ajouter le montant payé
-      participation.amountPaid += perProjectAmount;
-
-      // ✅ CORRECTION : Calculer le reste à payer correctement
-      participation.remainingToPay = Math.max(
-        participation.remainingToPay - perProjectAmount,
-        0
-      );
-
-      // ✅ Marquer comme complété si tout est payé
-      if (participation.remainingToPay === 0) {
-        participation.completed = true;
-      }
-
-      // ✅ Mettre à jour les dividendes du projet
-      project.dividends = (project.dividends || 0) + perProjectAmount;
-      await project.save();
+        
+    } catch (error) {
+        if (session.inTransaction()) {
+            await session.abortTransaction();
+        }
+        
+        console.error("❌ updateStatusPayemt:", error.message);
+        
+        return {
+            error: true,
+            statusCode: 500,
+            message: "Erreur serveur"
+        };
+        
+    } finally {
+        session.endSession();
     }
-
-    await user.save();
-
-    transaction.status = "confirmed";
-    await transaction.save();
-
-    // Préparer le retour avec populate pour avoir le nom du projet
-    await user.populate('projectPayments.projectId', 'nameProject');
-
-    const projectsStatus = user.projectPayments.map((p) => {
-      // Calculer le nombre de packs
-      const totalInvestment = p.amountPaid + p.remainingToPay;
-      const numberOfPacks = p.projectId?.packPrice 
-        ? Math.floor(totalInvestment / p.projectId.packPrice) 
-        : 0;
-
-      return {
-        projectId: p.projectId?._id,
-        nameProject: p.projectId?.nameProject || "Projet",
-        numberOfPacks: numberOfPacks,
-        amountPaidByUser: p.amountPaid,
-        remainingToPay: p.remainingToPay,
-        totalInvestment: totalInvestment,
-        completed: p.completed,
-      };
-    });
-
-    return {
-      error: false,
-      message: "Paiement confirmé et participation mise à jour.",
-      transaction,
-      user,
-      projectsStatus
-    };
-
-  } catch (error) {
-    console.error("Erreur dans updateStatusPayemt:", error);
-    return { 
-      error: true, 
-      statusCode: 500, 
-      message: "Erreur serveur", 
-      details: error.message 
-    };
-  }
 };
 
 module.exports.getProjectByUser = async (req, res) => {

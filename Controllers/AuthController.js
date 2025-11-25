@@ -456,7 +456,7 @@ module.exports.getUserById = async (req, res) => {
 
         // Recherchez l'utilisateur par ID en ne récupérant que certains champs
         const user = await User.findById(id);
-//console.log(user);
+console.log(user);
 
         if (!user) {
             return res.status(404).json({ message: 'Utilisateur non trouvé' });
@@ -469,7 +469,31 @@ module.exports.getUserById = async (req, res) => {
         res.status(500).json({ message: 'Erreur lors de la récupération de l\'utilisateur', error: error.message });
     }
 };
+// Récupérer le balance (dividende) de l'utilisateur connecté
+module.exports.getUserBalance = async (req, res) => {
+  try {
 
+    const userId = req.user.id;
+
+    // Rechercher l'utilisateur et récupérer uniquement le dividende
+    const user = await User.findById(userId).select('dividende');
+
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    return res.status(200).json({ 
+      message: 'Balance récupéré avec succès', 
+      dividende: user.dividende || 0 
+    });
+
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Erreur lors de la récupération du balance', 
+      error: error.message 
+    });
+  }
+};
 module.exports.sendPasswordResetOTP = async (req, res) => {
   try {
     const { telephone } = req.body;
