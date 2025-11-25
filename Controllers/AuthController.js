@@ -456,7 +456,7 @@ module.exports.getUserById = async (req, res) => {
 
         // Recherchez l'utilisateur par ID en ne récupérant que certains champs
         const user = await User.findById(id);
-console.log(user);
+//console.log(user);
 
         if (!user) {
             return res.status(404).json({ message: 'Utilisateur non trouvé' });
@@ -890,6 +890,73 @@ module.exports.updateUser = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Erreur interne du serveur",
+      error: error.message
+    });
+  }
+};
+module.exports.changePassword = async (req, res) => {
+  try {
+    const { userId, password, newPassword } = req.body;
+
+    // Validation des données
+    if (!userId || !password || !newPassword) {
+      return res.status(400).json({ 
+        message: "Tous les champs sont requis" 
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ 
+        message: "Le nouveau mot de passe doit contenir au moins 6 caractères" 
+      });
+    }
+
+    // Rechercher l'utilisateur par ID
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ 
+        message: "Utilisateur non trouvé" 
+      });
+    }
+
+    // Vérifier le mot de passe actuel
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ 
+        message: "Mot de passe actuel incorrect" 
+      });
+    }
+
+    // Vérifier que le nouveau mot de passe est différent
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    
+    if (isSamePassword) {
+      return res.status(400).json({ 
+        message: "Le nouveau mot de passe doit être différent de l'ancien" 
+      });
+    }
+
+    // Hasher le nouveau mot de passe
+    const salt = await bcrypt.genSalt(10);
+    const hashedNewPassword = await bcrypt.hash(newPassword, salt);
+
+    // Mettre à jour le mot de passe
+    user.password = hashedNewPassword;
+    await user.save();
+
+    console.log(`✅ Mot de passe changé: ${user.firstName} ${user.lastName} (${user._id})`);
+
+    res.status(200).json({ 
+      success: true,
+      message: "Mot de passe mis à jour avec succès" 
+    });
+    
+  } catch (error) {
+    console.error("❌ Erreur changePassword:", error);
+    res.status(500).json({ 
+      message: "Erreur lors de la mise à jour du mot de passe",
       error: error.message
     });
   }
