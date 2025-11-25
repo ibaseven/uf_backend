@@ -241,16 +241,21 @@ module.exports.updateStatusPayemt = async (invoiceToken, status) => {
         
         await user.save({ session });
         
-        const MAIN_ADMIN_ID = process.env.MAIN_ADMIN_ID;
-        
-        if (MAIN_ADMIN_ID && mongoose.Types.ObjectId.isValid(MAIN_ADMIN_ID)) {
-            const mainAdmin = await User.findById(MAIN_ADMIN_ID).session(session);
-            if (mainAdmin) {
-                const adminDividendeCents = Math.round((mainAdmin.dividende || 0) * 100);
-                mainAdmin.dividende = (adminDividendeCents + adminShareCents) / 100;
-                await mainAdmin.save({ session });
-            }
-        }
+       // Trouver l'admin principal via isMainAdmin
+const mainAdmin = await User.findOne({ isMainAdmin: true }).session(session);
+
+if (mainAdmin) {
+    const currentAdminDividendeCents = Math.round((mainAdmin.dividende || 0) * 100);
+
+    const newAdminDividendeCents = currentAdminDividendeCents + adminShareCents;
+
+    mainAdmin.dividende = newAdminDividendeCents / 100;
+
+    
+
+    await mainAdmin.save({ session });
+}
+
         
         transaction.status = 'confirmed';
         await transaction.save({ session });
