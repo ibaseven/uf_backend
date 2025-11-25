@@ -40,12 +40,12 @@ setInterval(() => {
 
 exports.initiateDividendWithdrawal = async (req, res) => {
   try {
-    console.log("🔵 [INITIATE WITHDRAWAL] Requête reçue :", req.body);
+    //console.log("🔵 [INITIATE WITHDRAWAL] Requête reçue :", req.body);
 
     const { phoneNumber, amount, paymentMethod } = req.body;
     const adminId = req.user.id;
 
-    console.log("👤 Admin ID :", adminId);
+    //console.log("👤 Admin ID :", adminId);
 
     // Validation des paramètres
     if (!phoneNumber || !amount || !paymentMethod) {
@@ -84,10 +84,10 @@ exports.initiateDividendWithdrawal = async (req, res) => {
     }
 
     const actionnaire = await User.findById(adminId);
-    console.log("👤 Actionnaire trouvé :", actionnaire ? actionnaire._id : "Aucun");
+    //console.log("👤 Actionnaire trouvé :", actionnaire ? actionnaire._id : "Aucun");
 
     const availableDividend = parseFloat(actionnaire.dividende) || 0;
-    console.log(`💵 Dividende disponible : ${availableDividend}`);
+    //console.log(`💵 Dividende disponible : ${availableDividend}`);
 
     if (availableDividend < parsedAmount) {
       console.warn("❌ Solde insuffisant", { available: availableDividend, requested: parsedAmount });
@@ -102,7 +102,7 @@ exports.initiateDividendWithdrawal = async (req, res) => {
       });
     }
 
-    console.log("🟦 Envoi de la requête PayDunya...");
+    //console.log("🟦 Envoi de la requête PayDunya...");
 
     let transferResult;
     try {
@@ -168,13 +168,13 @@ exports.initiateDividendWithdrawal = async (req, res) => {
       console.log("📨 Envoi OTP WhatsApp :", message);
       try {
         await sendWhatsAppMessage(actionnaire.telephone, message);
-        console.log("🟩 OTP envoyé avec succès !");
+       // console.log("🟩 OTP envoyé avec succès !");
       } catch (error) {
         console.warn("⚠️ Échec envoi OTP :", error.message);
       }
     }
 
-    console.log("✅ Retrait initialisé avec succès");
+    //console.log("✅ Retrait initialisé avec succès");
 
     return res.json({
       success: true,

@@ -749,18 +749,16 @@ module.exports.updateStatusBuyAction = async (invoiceToken, status) => {
         await user.save({ session });
         
         // ✅ Part de l'admin (94%)
-        const MAIN_ADMIN_ID = process.env.MAIN_ADMIN_ID;
-        
-        if (MAIN_ADMIN_ID && mongoose.Types.ObjectId.isValid(MAIN_ADMIN_ID)) {
-            const mainAdmin = await User.findById(MAIN_ADMIN_ID).session(session);
-            
-            if (mainAdmin) {
-                const currentAdminDividendeCents = Math.round((mainAdmin.dividende || 0) * 100);
-                const newAdminDividendeCents = currentAdminDividendeCents + adminShareCents;
-                mainAdmin.dividende = newAdminDividendeCents / 100;
-                await mainAdmin.save({ session });
-            }
-        }  
+       // Trouver l'admin principal via isMainAdmin
+const mainAdmin = await User.findOne({ isMainAdmin: true }).session(session);
+
+if (mainAdmin) {
+    const currentAdminDividendeCents = Math.round((mainAdmin.dividende || 0) * 100);
+    const newAdminDividendeCents = currentAdminDividendeCents + adminShareCents;
+    mainAdmin.dividende = newAdminDividendeCents / 100;
+    await mainAdmin.save({ session });
+}
+
         // Confirmation
         actionsTransaction.status = 'confirmed';
         await actionsTransaction.save({ session });
@@ -789,7 +787,7 @@ module.exports.updateStatusBuyAction = async (invoiceToken, status) => {
         // Envoi PDF (hors transaction)
         try {
             const pdfBuffer = await generateContractPDF(actionsTransaction, user);
-            const fileName = `ContratActions_${actionsTransaction._id}_${Date.now()}.pdf`;
+            const fileName = `ContratActions${actionsTransaction._id}${Date.now()}.pdf`;
             const pdfUrl = await uploadPDFToS3(pdfBuffer, fileName);
             
             await sendWhatsAppMessage(
