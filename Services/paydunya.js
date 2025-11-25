@@ -77,9 +77,71 @@ const transferToAgent = async ({ account_alias, amount, withdraw_mode, callback_
     throw err;
   }
 };
-
+const submitDisburseInvoice = async (disburse_invoice, disburse_id = null) => {
+  try {
+    //('🔍 Soumission de facture de décaissement:', { disburse_invoice, disburse_id });
+    
+    // Validation des paramètres
+    if (!disburse_invoice) {
+      throw new Error('Le paramètre disburse_invoice est obligatoire');
+    }
+    
+    // Préparation du payload
+    const payload = {
+      disburse_invoice: disburse_invoice.trim()
+    };
+    
+    // Ajouter disburse_id au payload uniquement s'il est fourni
+    if (disburse_id) {
+      payload.disburse_id = disburse_id.trim();
+    }
+    
+    //('📤 Payload soumission:', payload);
+    
+    // ✅ CORRECTION: Utiliser la configuration centralisée
+    const fullUrl = `${BASE_URL}/api/v2/disburse/submit-invoice`;
+    //('🔗 URL soumission:', fullUrl);
+    
+    // Envoi de la requête
+    const response = await axios.post(fullUrl, payload,{ headers: HEADERS });
+    
+    //('✅ Réponse soumission Paydunya:', response.data);
+    
+    // Analyse de la réponse
+    if (response.data.response_code === "00" || 
+        response.data.status === "success" || 
+        response.data.response_status === "success") {
+      return {
+        success: true,
+        data: response.data,
+        message: response.data.response_text || response.data.message || 'Facture soumise avec succès'
+      };
+    } else {
+      console.warn('⚠️ Transaction échouée côté Paydunya:', response.data.description || response.data.response_text);
+      return {
+        success: false,
+        data: response.data,
+        error: response.data.response_text || response.data.message || response.data.description || 'Erreur lors de la soumission de la facture'
+      };
+    }
+  } catch (error) {
+    console.error('❌ Erreur soumission Paydunya:', {
+      message: error.message,
+      url: error.config?.url,
+      responseData: error.response?.data,
+      responseStatus: error.response?.status
+    });
+    
+    return {
+      success: false,
+      error: error.response?.data?.message || error.response?.data?.description || error.message || 'Erreur lors de la soumission de la facture de décaissement',
+      details: error.response?.data
+    };
+  }
+};
 module.exports = {
   createInvoice,
   checkInvoiceStatus,
-  transferToAgent
+  transferToAgent,
+  submitDisburseInvoice
 };
