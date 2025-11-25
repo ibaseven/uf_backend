@@ -5,6 +5,7 @@ const Transaction = require("../Models/TransactionModel");
 const MAIN_ADMIN_ID = process.env.MAIN_ADMIN_ID
 const callbackurl=process.env.BACKEND_URL
 const mongoose = require('mongoose');
+const { sendWhatsAppMessage } = require("../utils/Whatsapp");
 module.exports.participateProject = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -271,7 +272,16 @@ if (mainAdmin) {
             remainingToPay: p.remainingToPay,
             completed: p.completed
         }));
-        
+        try {
+          await sendWhatsAppMessage(
+  user.telephone,
+  `Félicitations ${user.firstName} !Votre paiement a été *confirmé avec succès* et votre participation au(x) projet(s) a été mise à jour.*Détails :*  - Montant traité : ${transaction.amount} FCFA  - Nombre de projets concernés : ${transaction.projectIds.length}  
+- Statut : Participation enregistrée Vous pouvez consulter à tout moment l'évolution de vos projets et vos gains dans votre espace client.
+Merci pour votre confiance `
+);
+        } catch (error) {
+          console.error("❌ Erreur updateStatusBuyAction:", error.message);
+        }
         return {
             error: false,
             message: "Paiement confirmé",
