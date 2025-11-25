@@ -1,14 +1,16 @@
 require("dotenv").config();
-const express = require("express")
-const connectDB = require("./Config/DB")
-const cors = require("cors")
+const express = require("express");
+const connectDB = require("./Config/DB");
+const cors = require("cors");
 const morgan = require("morgan");
-const cookieParser = require('cookie-parser');
-const bodyParser = require("body-parser");
+const cookieParser = require("cookie-parser");
 const routes = require("./Routes/Routes");
+const crypto = require("crypto");
+
 const app = express();
 connectDB();
 
+// 4️⃣ CORS
 const allowedOrigins = [
   'http://localhost:3000',
   'https://staging-client.actionuniversalfab.com',
@@ -16,32 +18,38 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS: " + origin));
-    }
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error("Not allowed by CORS: " + origin));
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
 
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+// 5️⃣ Body parser normal pour le reste du site
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+
+// 6️⃣ Logs et cookies
 app.use(morgan("combined"));
 app.use(cookieParser());
 
+
+
+
+
+// 8️⃣ ROUTES
 app.use("/api", routes);
 
+
+// 9️⃣ Fallback
 app.use('/', (req, res) => {
-    res.send(`<h1>Welcome </h1>`)
-})
-const PORT= process.env.PORT
-app.listen(PORT,()=>{
-    console.log(`Le projet a demmarer sur le port ${PORT}`);
-    
-})
+  res.send(`<h1>Welcome</h1>`);
+});
+
+
+const PORT = process.env.PORT;
+app.listen(PORT, () => {
+  console.log(`Serveur démarré sur le port ${PORT}`);
+});
