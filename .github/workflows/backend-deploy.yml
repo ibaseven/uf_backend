@@ -70,6 +70,7 @@ jobs:
             NODE_ENV=${{ env.ENV }}
             PORT=5000
             MONGO_URI=${{ secrets.MONGO_URI }}
+            MAIN_ADMIN_ID=${{ secrets.MAIN_ADMIN_ID }}
             JWT_KEY=${{ secrets.JWT_KEY }}
             BACKEND_URL=${{ secrets.BACKEND_URL }}
             PAYDUNYA_MASTER_KEY=${{ secrets.PAYDUNYA_MASTER_KEY }}
