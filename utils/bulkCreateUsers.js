@@ -164,7 +164,12 @@ module.exports.bulkCreateUsersFromPDF = async (req, res) => {
     console.log(`\n👥 Traitement de ${users.length} utilisateurs...`);
 
     let created = 0, skipped = 0, errors = [];
+    const createdUsers = []; // Pour stocker les utilisateurs créés avec leurs mots de passe
 
+    // ========================================
+    // ÉTAPE 1: CRÉER TOUS LES UTILISATEURS
+    // ========================================
+    
     for (const u of users) {
       try {
         // Vérifier si l'utilisateur existe déjà
@@ -195,26 +200,15 @@ module.exports.bulkCreateUsersFromPDF = async (req, res) => {
         created++;
         console.log(`✅ [${u.id}] ${newUser.firstName} ${newUser.lastName} créé avec succès`);
 
-        // Envoyer le message WhatsApp si activé
+        // Stocker pour envoi WhatsApp ultérieur
         if (SEND_WHATSAPP) {
-          try {
-            await sendWhatsAppMessage(
-              newUser.telephone,
-              `Bonjour ${newUser.firstName},Votre compte Universall Fab a été créé.
-               Identifiant : ${newUser.telephone} Mot de passe : ${password}
-              Bienvenue sur Universal Fab! Vous Pouvez y acceder en cliquant sur le lien suivant https://actionuniversalfab.com`
-            );
-            console.log(`📱 WhatsApp envoyé à ${newUser.telephone}`);
-          } catch (msgErr) {
-            console.error(`❌ WhatsApp KO pour ${newUser.telephone}:`, msgErr.message);
-            errors.push({ 
-              id: u.id,
-              telephone: newUser.telephone, 
-              type: "whatsapp", 
-              error: msgErr.message 
-            });
-          }
+          createdUsers.push({
+            id: u.id,
+            user: newUser,
+            password: password
+          });
         }
+        
       } catch (err) {
         console.error(`❌ Erreur création [${u.id}] ${u.firstName} ${u.lastName}:`, err.message);
         errors.push({ 
@@ -227,14 +221,86 @@ module.exports.bulkCreateUsersFromPDF = async (req, res) => {
       }
     }
 
+    // ========================================
+    // ÉTAPE 2: ENVOYER LES MESSAGES PAR LOTS
+    // ========================================
+    
+    if (SEND_WHATSAPP && createdUsers.length > 0) {
+      console.log(`\n📱 Envoi de ${createdUsers.length} messages WhatsApp par lots de 20...`);
+      
+      const BATCH_SIZE = 20;
+      const DELAY_MS = 45000; // 45 secondes
+      
+      // Diviser en lots
+      const batches = [];
+      for (let i = 0; i < createdUsers.length; i += BATCH_SIZE) {
+        batches.push(createdUsers.slice(i, i + BATCH_SIZE));
+      }
+      
+      console.log(`📦 ${batches.length} lot(s) à traiter`);
+      
+      // Traiter chaque lot
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex];
+        const batchNumber = batchIndex + 1;
+        
+        console.log(`\n📤 Lot ${batchNumber}/${batches.length} (${batch.length} messages)...`);
+        
+        // Envoyer tous les messages du lot en parallèle
+        const promises = batch.map(async ({ id, user, password }) => {
+          try {
+            await sendWhatsAppMessage(
+              user.telephone,
+              `Bonjour ${user.firstName},Votre compte Universal Fab a été créé.Identifiant : ${user.telephone} Mot de passe : ${password} Bienvenue sur Universal Fab! Accédez à votre compte : https://actionuniversalfab.com`);
+            console.log(`   ✅ [${id}] ${user.firstName} ${user.lastName} - ${user.telephone}`);
+            return { success: true, id, telephone: user.telephone };
+          } catch (msgErr) {
+            console.error(`   ❌ [${id}] ${user.telephone}: ${msgErr.message}`);
+            errors.push({ 
+              id,
+              telephone: user.telephone, 
+              user: `${user.firstName} ${user.lastName}`,
+              type: "whatsapp", 
+              error: msgErr.message 
+            });
+            return { success: false, id, telephone: user.telephone, error: msgErr.message };
+          }
+        });
+        
+        // Attendre que tous les messages du lot soient envoyés
+        const results = await Promise.allSettled(promises);
+        
+        const batchSuccess = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+        const batchFailed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)).length;
+        
+        console.log(`   📊 Lot ${batchNumber}: ${batchSuccess} succès, ${batchFailed} échecs`);
+        
+        // Attendre 45 secondes avant le prochain lot (sauf pour le dernier)
+        if (batchIndex < batches.length - 1) {
+          console.log(`   ⏳ Pause de 45 secondes avant le prochain lot...`);
+          await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+        }
+      }
+      
+      console.log(`\n✅ Envoi WhatsApp terminé`);
+    }
+
+    // ========================================
+    // ÉTAPE 3: NETTOYER ET RÉPONDRE
+    // ========================================
+    
     // Supprimer le fichier PDF uploadé
     if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
 
-    console.log("\n📊 RÉSUMÉ:");
+    console.log("\n📊 RÉSUMÉ FINAL:");
     console.log(`   Total détecté: ${users.length}`);
     console.log(`   ✅ Créés: ${created}`);
     console.log(`   ⏭️  Ignorés (déjà existants): ${skipped}`);
     console.log(`   ❌ Erreurs: ${errors.length}`);
+    if (SEND_WHATSAPP) {
+      const whatsappSuccess = createdUsers.length - errors.filter(e => e.type === 'whatsapp').length;
+      console.log(`   📱 WhatsApp envoyés: ${whatsappSuccess}/${createdUsers.length}`);
+    }
 
     return res.status(201).json({
       success: true,
@@ -243,10 +309,12 @@ module.exports.bulkCreateUsersFromPDF = async (req, res) => {
         total: users.length, 
         created, 
         skipped, 
-        failed: errors.length 
+        failed: errors.length,
+        whatsappSent: SEND_WHATSAPP ? createdUsers.length - errors.filter(e => e.type === 'whatsapp').length : 0
       },
       errors: errors.length > 0 ? errors : undefined,
     });
+    
   } catch (error) {
     console.error("💥 Erreur complète:", error);
     if (pdfPath && fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
