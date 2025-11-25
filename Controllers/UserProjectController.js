@@ -5,6 +5,7 @@ const Transaction = require("../Models/TransactionModel");
 const MAIN_ADMIN_ID = process.env.MAIN_ADMIN_ID
 const callbackurl=process.env.BACKEND_URL
 const mongoose = require('mongoose');
+const { sendWhatsAppMessage } = require("../utils/Whatsapp");
 module.exports.participateProject = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -241,16 +242,21 @@ module.exports.updateStatusPayemt = async (invoiceToken, status) => {
         
         await user.save({ session });
         
-        const MAIN_ADMIN_ID = process.env.MAIN_ADMIN_ID;
-        
-        if (MAIN_ADMIN_ID && mongoose.Types.ObjectId.isValid(MAIN_ADMIN_ID)) {
-            const mainAdmin = await User.findById(MAIN_ADMIN_ID).session(session);
-            if (mainAdmin) {
-                const adminDividendeCents = Math.round((mainAdmin.dividende || 0) * 100);
-                mainAdmin.dividende = (adminDividendeCents + adminShareCents) / 100;
-                await mainAdmin.save({ session });
-            }
-        }
+       // Trouver l'admin principal via isMainAdmin
+const mainAdmin = await User.findOne({ isMainAdmin: true }).session(session);
+
+if (mainAdmin) {
+    const currentAdminDividendeCents = Math.round((mainAdmin.dividende || 0) * 100);
+
+    const newAdminDividendeCents = currentAdminDividendeCents + adminShareCents;
+
+    mainAdmin.dividende = newAdminDividendeCents / 100;
+
+    
+
+    await mainAdmin.save({ session });
+}
+
         
         transaction.status = 'confirmed';
         await transaction.save({ session });
@@ -266,7 +272,16 @@ module.exports.updateStatusPayemt = async (invoiceToken, status) => {
             remainingToPay: p.remainingToPay,
             completed: p.completed
         }));
-        
+        try {
+          await sendWhatsAppMessage(
+  user.telephone,
+  `Félicitations ${user.firstName} !Votre paiement a été *confirmé avec succès* et votre participation au(x) projet(s) a été mise à jour.*Détails :*  - Montant traité : ${transaction.amount} FCFA  - Nombre de projets concernés : ${transaction.projectIds.length}  
+- Statut : Participation enregistrée Vous pouvez consulter à tout moment l'évolution de vos projets et vos gains dans votre espace client.
+Merci pour votre confiance `
+);
+        } catch (error) {
+          console.error("❌ Erreur updateStatusBuyAction:", error.message);
+        }
         return {
             error: false,
             message: "Paiement confirmé",

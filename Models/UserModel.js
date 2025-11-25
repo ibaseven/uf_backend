@@ -75,8 +75,11 @@ parrain: {
   parrainageBonus: {
     type: Number,
     default: 0
-  }
-
+  },
+isMainAdmin: {
+  type: Boolean,
+  default: false
+}
 })
 
 module.exports=mongoose.model("User",UserSchema)
