@@ -79,6 +79,14 @@ parrain: {
 isMainAdmin: {
   type: Boolean,
   default: false
+},
+isTheSuperAdmin:{
+  type: Boolean,
+  default: false
+},
+isTheOwner:{
+  type: Boolean,
+  default: false
 }
 })
 
