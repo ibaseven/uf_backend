@@ -1,5 +1,5 @@
 const express = require("express");
-const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, verifyOTPAndSignIn, VerifyCreateAccountOTP, createAdmin, getAllActionnaire, getUserById, sendPasswordResetOTP, verifyOTPAndResetPassword, resendPasswordResetOTP, resetPassWord, updateOwnProfile, updateUser, getUserBalance, changePassword } = require("../Controllers/AuthController");
+const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, verifyOTPAndSignIn, VerifyCreateAccountOTP, createAdmin, getAllActionnaire, getUserById, sendPasswordResetOTP, verifyOTPAndResetPassword, resendPasswordResetOTP, resetPassWord, updateOwnProfile, updateUser, getUserBalance, changePassword, getTheOwner } = require("../Controllers/AuthController");
 const { participateProject, giveYourDividendToTheProject, getProjectByUser } = require("../Controllers/UserProjectController");
 const { authenticateTokenAndUserData, authenticateUser, adminRole, authenticateAdmin } = require("../Middlewares/VerifyToken");
 const { createProject, getAllProject } = require("../Controllers/ProjectController");
@@ -12,6 +12,7 @@ const { previewPdfImport } = require("../utils/test");
 const { updateActionPrice, getActionPrice } = require("../Controllers/SettingsController");
 const { payduniaCallbackLimiter, verifyPaydunyaCallback } = require("../Middlewares/payduniaCallbackMiddleware");
 const { initiateDividendWithdrawal, confirmDividendWithdrawal } = require("../Controllers/Balance");
+const { deducteTheFee } = require("../Controllers/feesController");
 
 
 const router = express.Router();
@@ -32,7 +33,8 @@ router.get('/getMyProfile', authenticateUser, getMyProfile);
 router.post("/buyActions",authenticateUser,buyAction)
 router.post("/bulk-create-users",uploadPDF, bulkCreateUsersFromPDF);
 router.post("/ipn",payduniaCallbackLimiter,verifyPaydunyaCallback,handlePaymentCallback)
-router.get("/getAllActionnaire",getAllActionnaire)
+router.get("/getAllActionnaire",authenticateUser,getAllActionnaire)
+router.get("/getTheOwner",authenticateUser,getTheOwner)
 router.get("/getransactionbyuser",authenticateUser,getAllTransactionsByUser)
 router.get("/getAllProject",authenticateUser,getAllProject)
 router.get("/getProjectByUser",authenticateUser,getProjectByUser)
@@ -42,7 +44,6 @@ router.post("/ipnpayment",payduniaCallbackLimiter,verifyPaydunyaCallback,handleB
 router.post("/createAdmin",createAdmin)
 router.get("/get-user/:id",authenticateUser,getUserById);
 router.get("/get-admin",adminRole,getUserBalance);
-
 router.put('/updateProfile', authenticateUser, updateOwnProfile);
 router.post('/request-password-reset', sendPasswordResetOTP);
 router.post('/verify-reset-otp', verifyOTPAndResetPassword);
@@ -53,4 +54,5 @@ router.get("/action/getPrice",getActionPrice);
 router.put('/admin/users/:userId', authenticateUser, adminRole, updateUser);
 router.post("/dividends/withdraw/initiate" ,adminRole, initiateDividendWithdrawal);
 router.post("/dividends/withdraw/confirm",adminRole, confirmDividendWithdrawal);
+router.post("/deduceFees",authenticateUser,deducteTheFee);
 module.exports=router

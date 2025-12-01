@@ -231,7 +231,8 @@ module.exports.getMyProfile = async (req, res) => {
         telephone: user.telephone,
         role: user.role,
         dividende: user.dividende,
-        actionsNumber:user.actionsNumber
+        actionsNumber:user.actionsNumber,
+        isTheSuperAdmin:user.isTheSuperAdmin
       },
       statistics: {
         totalInvested,
@@ -363,6 +364,26 @@ module.exports.getAllActionnaire = async (req, res) => {
       success: true,
       total: actionnaires.length,
       actionnaires
+    });
+
+  } catch (error) {
+    console.error("Erreur getAllActionnaire:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Erreur interne du serveur",
+      error
+    });
+  }
+};
+
+module.exports.getTheOwner = async (req, res) => {
+  try {
+    const owner = await User.findOne({ isMainAdmin: true });
+
+    return res.status(200).json({
+      success: true,
+      total: owner.length,
+      owner
     });
 
   } catch (error) {
