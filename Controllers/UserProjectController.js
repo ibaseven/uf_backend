@@ -34,9 +34,8 @@ module.exports.participateProject = async (req, res) => {
       };
       user.projectPayments = [...(user.projectPayments || []), participation];
     } else {
-      
       participation.remainingToPay += project.packPrice;
-      participation.completed = false; // Réinitialiser car nouveau pack ajouté
+      participation.completed = false;
     }
 
     // Ajouter le projet dans projectId si pas déjà présent
@@ -46,9 +45,37 @@ module.exports.participateProject = async (req, res) => {
 
     await user.save();
 
-    // Calculer le nombre de packs (basé sur amountPaid + remainingToPay)
+    // Calculer le nombre de packs
     const totalInvestment = participation.amountPaid + participation.remainingToPay;
     const numberOfPacks = totalInvestment / project.packPrice;
+
+    // ===== MISE À JOUR DES PARTICIPANTS DU PROJET =====
+    let projectParticipant = project.participants.find(
+      (p) => p.userId.toString() === userId.toString()
+    );
+
+    if (!projectParticipant) {
+      // Nouveau participant
+      project.participants.push({
+        userId: userId,
+        name: user.name || user.email,
+        numberOfPacks: numberOfPacks,
+        totalInvestment: totalInvestment,
+        amountPaid: participation.amountPaid,
+        remainingToPay: participation.remainingToPay,
+        completed: participation.completed,
+        participationDate: new Date()
+      });
+    } else {
+      // Mettre à jour le participant existant
+      projectParticipant.numberOfPacks = numberOfPacks;
+      projectParticipant.totalInvestment = totalInvestment;
+      projectParticipant.amountPaid = participation.amountPaid;
+      projectParticipant.remainingToPay = participation.remainingToPay;
+      projectParticipant.completed = participation.completed;
+    }
+
+    await project.save();
 
     res.status(200).json({
       success: true,
@@ -60,12 +87,17 @@ module.exports.participateProject = async (req, res) => {
         amountPaid: participation.amountPaid,
         remainingToPay: participation.remainingToPay,
         completed: participation.completed
-      }
+      },
+      totalParticipants: project.participants.length
     });
 
   } catch (error) {
     console.error("Erreur participation projet:", error);
-    res.status(500).json({success: false, message: "Erreur serveur", error: error.message });
+    res.status(500).json({
+      success: false, 
+      message: "Erreur serveur", 
+      error: error.message 
+    });
   }
 };
 
