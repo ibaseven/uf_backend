@@ -85,3 +85,41 @@ module.exports.getAllTransactions = async (req, res) => {
     });
   }
 };
+
+
+module.exports.getTransactionsByProcess = async (req, res) => {
+  try {
+    const transactions = await Transaction.find();
+
+    // Filtrer sur la description
+    const actionsTransactions = transactions.filter(t =>
+      t.description && t.description.includes("actions")
+    );
+
+    const particeProjectTransactions = transactions.filter(t =>
+      t.description && t.description.includes("projets")
+    );
+const sommeActionsTransactions = actionsTransactions
+  .filter(t => t.status === "confirmed")
+  .reduce((total, t) => total + (t.amount || 0), 0);
+const sommeProjectTransactions = particeProjectTransactions
+  .filter(t => t.status === "confirmed")
+  .reduce((total, t) => total + (t.amount || 0), 0);
+    return res.status(200).json({
+      message: "Transactions récupérées avec succès",
+      actions: actionsTransactions.length,
+      sommeActions:sommeActionsTransactions,
+      sommeProject:sommeProjectTransactions,
+      project: particeProjectTransactions.length,
+      particeProjectTransactions,
+      actionsTransactions
+    });
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération des transactions :", error);
+    return res.status(500).json({
+      message: "Erreur interne du serveur",
+      error: error.message,
+    });
+  }
+};
