@@ -2,11 +2,11 @@ const express = require("express");
 const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, verifyOTPAndSignIn, VerifyCreateAccountOTP, createAdmin, getAllActionnaire, getUserById, sendPasswordResetOTP, verifyOTPAndResetPassword, resendPasswordResetOTP, resetPassWord, updateOwnProfile, updateUser, getUserBalance, changePassword, getTheOwner } = require("../Controllers/AuthController");
 const { participateProject, giveYourDividendToTheProject, getProjectByUser } = require("../Controllers/UserProjectController");
 const { authenticateTokenAndUserData, authenticateUser, adminRole, authenticateAdmin } = require("../Middlewares/VerifyToken");
-const { createProject, getAllProject } = require("../Controllers/ProjectController");
+const { createProject, getAllProject, getProjectParticipants, decreaseParticipantPacks, increaseParticipantPacks } = require("../Controllers/ProjectController");
 const { handlePaymentCallback, handleBuyActionsCallback } = require("../Controllers/paymentCallbackController");
 const { buyAction } = require("../Controllers/ActionController");
 const { bulkCreateUsersFromPDF, uploadPDF } = require("../utils/bulkCreateUsers");
-const { getAllTransactionsByUser, getAllTransactions } = require("../Controllers/TransactionController");
+const { getAllTransactionsByUser, getAllTransactions, getTransactionsByProcess } = require("../Controllers/TransactionController");
 const { uploadImg } = require("../Middlewares/awsUpload");
 const { previewPdfImport } = require("../utils/test");
 const { updateActionPrice, getActionPrice } = require("../Controllers/SettingsController");
@@ -55,4 +55,9 @@ router.put('/admin/users/:userId', authenticateUser, adminRole, updateUser);
 router.post("/dividends/withdraw/initiate" ,adminRole, initiateDividendWithdrawal);
 router.post("/dividends/withdraw/confirm",adminRole, confirmDividendWithdrawal);
 router.post("/deduceFees",authenticateUser,deducteTheFee);
+router.get("/getTransactionsByProcess",getTransactionsByProcess)
+router.get('/projects/:projectId/participants', authenticateUser,getProjectParticipants);
+
+router.put('/projects/:projectId/participants/:userId/decrease',authenticateUser,decreaseParticipantPacks);
+router.put('/projects/:projectId/participants/:userId/increase',authenticateUser,increaseParticipantPacks);
 module.exports=router
