@@ -982,3 +982,21 @@ module.exports.changePassword = async (req, res) => {
     });
   }
 };
+
+
+module.exports.deleteUser = async(req,res) => {
+  try {
+    const {id}=req.params
+    const deleteActionnaire= await User.findByIdAndDelete(id)
+    return res.status(200).json({
+      success: true, 
+      message:"User detele succesfully",deleteActionnaire
+    })
+  } catch (error) {
+    console.error("❌ Erreur changePassword:", error);
+    res.status(500).json({ 
+      message: "Erreur lors de la mise à jour du mot de passe",
+      error: error.message
+    });
+  }
+}

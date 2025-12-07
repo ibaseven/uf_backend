@@ -1,8 +1,8 @@
 const express = require("express");
-const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, verifyOTPAndSignIn, VerifyCreateAccountOTP, createAdmin, getAllActionnaire, getUserById, sendPasswordResetOTP, verifyOTPAndResetPassword, resendPasswordResetOTP, resetPassWord, updateOwnProfile, updateUser, getUserBalance, changePassword, getTheOwner } = require("../Controllers/AuthController");
+const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, verifyOTPAndSignIn, VerifyCreateAccountOTP, createAdmin, getAllActionnaire, getUserById, sendPasswordResetOTP, verifyOTPAndResetPassword, resendPasswordResetOTP, resetPassWord, updateOwnProfile, updateUser, getUserBalance, changePassword, getTheOwner, deleteUser } = require("../Controllers/AuthController");
 const { participateProject, giveYourDividendToTheProject, getProjectByUser } = require("../Controllers/UserProjectController");
 const { authenticateTokenAndUserData, authenticateUser, adminRole, authenticateAdmin } = require("../Middlewares/VerifyToken");
-const { createProject, getAllProject, getProjectParticipants, decreaseParticipantPacks, increaseParticipantPacks } = require("../Controllers/ProjectController");
+const { createProject, getAllProject, getProjectParticipants, decreaseParticipantPacks, increaseParticipantPacks, updateProject, deleteProject } = require("../Controllers/ProjectController");
 const { handlePaymentCallback, handleBuyActionsCallback } = require("../Controllers/paymentCallbackController");
 const { buyAction } = require("../Controllers/ActionController");
 const { bulkCreateUsersFromPDF, uploadPDF } = require("../utils/bulkCreateUsers");
@@ -57,7 +57,9 @@ router.post("/dividends/withdraw/confirm",adminRole, confirmDividendWithdrawal);
 router.post("/deduceFees",authenticateUser,deducteTheFee);
 router.get("/getTransactionsByProcess",getTransactionsByProcess)
 router.get('/projects/:projectId/participants', authenticateUser,getProjectParticipants);
-
 router.put('/projects/:projectId/participants/:userId/decrease',authenticateUser,decreaseParticipantPacks);
 router.put('/projects/:projectId/participants/:userId/increase',authenticateUser,increaseParticipantPacks);
+router.put("/updateProject/:id",authenticateUser, adminRole,updateProject)
+router.delete("/deleteProject/:id",authenticateUser, adminRole,deleteProject)
+router.delete("/deteleUser/:id",authenticateUser, adminRole,deleteUser)
 module.exports=router
