@@ -80,6 +80,14 @@ isMainAdmin: {
   type: Boolean,
   default: false
 },
+ dividende_actions:{
+        type:Number,
+        default:0
+    },
+     dividende_project:{
+        type:Number,
+        default:0
+    },
 isTheSuperAdmin:{
   type: Boolean,
   default: false

@@ -1,5 +1,5 @@
 const express = require("express");
-const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, verifyOTPAndSignIn, VerifyCreateAccountOTP, createAdmin, getAllActionnaire, getUserById, sendPasswordResetOTP, verifyOTPAndResetPassword, resendPasswordResetOTP, resetPassWord, updateOwnProfile, updateUser, getUserBalance, changePassword, getTheOwner, deleteUser } = require("../Controllers/AuthController");
+const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, verifyOTPAndSignIn, VerifyCreateAccountOTP, createAdmin, getAllActionnaire, getUserById, sendPasswordResetOTP, verifyOTPAndResetPassword, resendPasswordResetOTP, resetPassWord, updateOwnProfile, updateUser, getUserBalance, changePassword, getTheOwner, deleteUser, resendSignUpOTP, resendLoginOTP } = require("../Controllers/AuthController");
 const { participateProject, giveYourDividendToTheProject, getProjectByUser } = require("../Controllers/UserProjectController");
 const { authenticateTokenAndUserData, authenticateUser, adminRole, authenticateAdmin } = require("../Middlewares/VerifyToken");
 const { createProject, getAllProject, getProjectParticipants, decreaseParticipantPacks, increaseParticipantPacks, updateProject, deleteProject } = require("../Controllers/ProjectController");
@@ -11,7 +11,7 @@ const { uploadImg } = require("../Middlewares/awsUpload");
 const { previewPdfImport } = require("../utils/test");
 const { updateActionPrice, getActionPrice } = require("../Controllers/SettingsController");
 const { payduniaCallbackLimiter, verifyPaydunyaCallback } = require("../Middlewares/payduniaCallbackMiddleware");
-const { initiateDividendWithdrawal, confirmDividendWithdrawal } = require("../Controllers/Balance");
+const { initiateDividendWithdrawal, confirmDividendWithdrawal, initiateDividendActionsWithdrawal, initiateDividendProjectWithdrawal, confirmDividendProjectWithdrawal, confirmDividendActionsWithdrawal } = require("../Controllers/Balance");
 const { deducteTheFee } = require("../Controllers/feesController");
 
 
@@ -22,8 +22,10 @@ const uploadFields = [
 
 router.post("/createAccount",CreateAccount)
 router.post("/login",SignAccount)
+router.post("/resend-login-otp", resendLoginOTP);
 router.post("/auth/verify-otp", verifyOTPAndSignIn);
 router.post("/createAccount/verify-otp", VerifyCreateAccountOTP);
+router.post("/resendOtpCreateAccount/verify-otp", resendSignUpOTP);
 router.get('/verify-token/:token', checkAndGetUserByToken);
 router.post('/change-password', changePassword);
 router.post("/createAnProject",uploadImg(uploadFields),createProject)
@@ -52,8 +54,10 @@ router.post("/reset-password/:resetToken", resetPassWord);
 router.put("/action/price", adminRole,updateActionPrice);
 router.get("/action/getPrice",getActionPrice);
 router.put('/admin/users/:userId', authenticateUser, adminRole, updateUser);
-router.post("/dividends/withdraw/initiate" ,adminRole, initiateDividendWithdrawal);
-router.post("/dividends/withdraw/confirm",adminRole, confirmDividendWithdrawal);
+router.post("/dividends/withdrawActions/initiate" ,adminRole, initiateDividendActionsWithdrawal);
+router.post("/dividends/withdrawProjects/initiate" ,adminRole, initiateDividendProjectWithdrawal);
+router.post("/dividends/withdrawProjects/confirm",adminRole, confirmDividendProjectWithdrawal);
+router.post("/dividends/withdrawActions/confirm",adminRole, confirmDividendActionsWithdrawal);
 router.post("/deduceFees",authenticateUser,deducteTheFee);
 router.get("/getTransactionsByProcess",getTransactionsByProcess)
 router.get('/projects/:projectId/participants', authenticateUser,getProjectParticipants);
