@@ -753,9 +753,9 @@ module.exports.updateStatusBuyAction = async (invoiceToken, status) => {
 const mainAdmin = await User.findOne({ isMainAdmin: true }).session(session);
 
 if (mainAdmin) {
-    const currentAdminDividendeCents = Math.round((mainAdmin.dividende || 0) * 100);
+    const currentAdminDividendeCents = Math.round((mainAdmin.dividende_actions || 0) * 100);
     const newAdminDividendeCents = currentAdminDividendeCents + adminShareCents;
-    mainAdmin.dividende = newAdminDividendeCents / 100;
+    mainAdmin.dividende_actions = newAdminDividendeCents / 100;
     await mainAdmin.save({ session });
 }
 

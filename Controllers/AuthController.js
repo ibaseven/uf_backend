@@ -186,7 +186,58 @@ module.exports.VerifyCreateAccountOTP = async (req, res) => {
     });
   }
 };
+module.exports.resendSignUpOTP = async (req, res) => {
+  try {
+    const { tempUserId } = req.body;
+    
+    const telephone = tempUserId; // tempUserId contient le numéro de téléphone
 
+    // Vérifier si les données temporaires existent dans otpStore
+    const otpData = otpStore[telephone];
+    if (!otpData) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Aucune session de création trouvée ou expirée" 
+      });
+    }
+
+    // Vérifier si les données temporaires n'ont pas expiré
+    if (otpData.expiresAt < new Date()) {
+      delete otpStore[telephone];
+      return res.status(401).json({ 
+        success: false,
+        message: "Session de création expirée" 
+      });
+    }
+
+    // Générer un nouveau code OTP
+    const newOtpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Mettre à jour l'OTP existant en gardant les autres données
+    otpStore[telephone] = {
+      ...otpData, // Garde toutes les données existantes (firstName, lastName, password, etc.)
+      otp: newOtpCode, // Met à jour le code OTP
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000) // Nouvelle expiration de 5 minutes
+    };
+
+    // Envoyer le nouveau code OTP via WhatsApp
+    await sendWhatsAppMessage(telephone, newOtpCode);
+
+    return res.status(200).json({ 
+      success: true,
+      message: "Nouveau code de vérification envoyé", 
+      expiresIn: 5 * 60 // en secondes
+    });
+    
+  } catch (error) {
+    console.error('Erreur lors du renvoi OTP:', error);
+    res.status(500).json({ 
+      success: false,
+      message: "Erreur interne du serveur", 
+      error: error.message 
+    });
+  }
+};
 module.exports.getMyProfile = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -315,7 +366,65 @@ module.exports.verifyOTPAndSignIn = async (req, res) => {
     res.status(500).json({ message: "Erreur interne du serveur" });
   }
 };
+module.exports.resendLoginOTP = async (req, res) => {
+  try {
+    const { userId } = req.body;
 
+    // Vérifier si les données OTP existent pour cet utilisateur
+    if (!otpStore[userId]) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Session de connexion expirée. Veuillez recommencer." 
+      });
+    }
+
+    // Vérifier si la session n'a pas déjà expiré
+    if (new Date() > otpStore[userId].expiresAt) {
+      delete otpStore[userId];
+      return res.status(401).json({ 
+        success: false,
+        message: "Session de connexion expirée. Veuillez recommencer." 
+      });
+    }
+
+    // Récupérer le numéro de téléphone de l'utilisateur
+    const user = await User.findById(userId).select("telephone");
+    if (!user) {
+      delete otpStore[userId];
+      return res.status(404).json({ 
+        success: false,
+        message: "Utilisateur non trouvé" 
+      });
+    }
+
+    // Générer un nouveau code OTP
+    const newOtpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Mettre à jour l'OTP en gardant le userId
+    otpStore[userId] = {
+      code: newOtpCode,
+      expiresAt: new Date(Date.now() + 2 * 60 * 1000), // 2 minutes
+      type: 'login'
+    };
+
+    // Envoyer le nouveau code OTP via WhatsApp
+    await sendWhatsAppMessage(user.telephone, newOtpCode);
+
+    return res.status(200).json({ 
+      success: true,
+      message: "Nouveau code de vérification envoyé", 
+      expiresIn: 2 * 60 // en secondes
+    });
+
+  } catch (error) {
+    console.error('Erreur lors du renvoi OTP de connexion:', error);
+    res.status(500).json({ 
+      success: false,
+      message: "Erreur interne du serveur", 
+      error: error.message 
+    });
+  }
+};
 module.exports.createAdmin = async (req, res) => {
   try {
     const { telephone, firstName, lastName, password, role } = req.body;
@@ -915,6 +1024,8 @@ module.exports.updateUser = async (req, res) => {
     });
   }
 };
+
+
 module.exports.changePassword = async (req, res) => {
   try {
     const { userId, password, newPassword } = req.body;
