@@ -278,11 +278,11 @@ module.exports.updateStatusPayemt = async (invoiceToken, status) => {
 const mainAdmin = await User.findOne({ isMainAdmin: true }).session(session);
 
 if (mainAdmin) {
-    const currentAdminDividendeCents = Math.round((mainAdmin.dividende || 0) * 100);
+    const currentAdminDividendeCents = Math.round((mainAdmin.dividende_project || 0) * 100);
 
     const newAdminDividendeCents = currentAdminDividendeCents + adminShareCents;
 
-    mainAdmin.dividende = newAdminDividendeCents / 100;
+    mainAdmin.dividende_project = newAdminDividendeCents / 100;
 
     
 
