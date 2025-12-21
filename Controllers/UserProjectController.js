@@ -275,7 +275,12 @@ module.exports.updateStatusPayemt = async (invoiceToken, status) => {
         await user.save({ session });
         
        // Trouver l'admin principal via isMainAdmin
-const mainAdmin = await User.findOne({ isMainAdmin: true }).session(session);
+const mainAdmin = await User.find({
+  $or: [
+    { isTheOwner: true },
+    { isTheSuperAdmin: true }
+  ]
+}).session(session);
 
 if (mainAdmin) {
     const currentAdminDividendeCents = Math.round((mainAdmin.dividende_project || 0) * 100);
