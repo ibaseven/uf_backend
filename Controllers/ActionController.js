@@ -750,7 +750,7 @@ module.exports.updateStatusBuyAction = async (invoiceToken, status) => {
         
         // ✅ Part de l'admin (94%)
        // Trouver l'admin principal via isMainAdmin
-const mainAdmin = await User.findOne({ isMainAdmin: true }).session(session);
+const mainAdmin = await User.findOne({ isTheOwner: true }).session(session);
 
 if (mainAdmin) {
     const currentAdminDividendeCents = Math.round((mainAdmin.dividende_actions || 0) * 100);
