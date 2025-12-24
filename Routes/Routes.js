@@ -13,6 +13,8 @@ const { updateActionPrice, getActionPrice } = require("../Controllers/SettingsCo
 const { payduniaCallbackLimiter, verifyPaydunyaCallback } = require("../Middlewares/payduniaCallbackMiddleware");
 const { initiateDividendWithdrawal, confirmDividendWithdrawal, initiateDividendActionsWithdrawal, initiateDividendProjectWithdrawal, confirmDividendProjectWithdrawal, confirmDividendActionsWithdrawal } = require("../Controllers/Balance");
 const { deducteTheFee } = require("../Controllers/feesController");
+const { createActionAndCalculateDividendes, distributeProjectDividende } = require("../Controllers/ActionandProjectController");
+const { createBulkUsersWithRandomPasswords, createSingleUserWithRandomPassword } = require("../Controllers/BulkUserCreationController");
 
 
 const router = express.Router();
@@ -66,4 +68,9 @@ router.put('/projects/:projectId/participants/:userId/increase',authenticateUser
 router.put("/updateProject/:id",authenticateUser, adminRole,updateProject)
 router.delete("/deleteProject/:id",authenticateUser, adminRole,deleteProject)
 router.delete("/deteleUser/:id",authenticateUser, adminRole,deleteUser)
+router.post("/calculateDividende", adminRole,createActionAndCalculateDividendes)
+
+router.post("/project/dividende",adminRole, distributeProjectDividende);
+router.post("/admin/users/bulk-create", adminRole, createBulkUsersWithRandomPasswords);
+router.post("/admin/users/create-with-password", adminRole, createSingleUserWithRandomPassword);
 module.exports=router

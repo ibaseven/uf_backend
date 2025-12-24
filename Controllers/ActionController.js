@@ -750,18 +750,20 @@ module.exports.updateStatusBuyAction = async (invoiceToken, status) => {
         
         // ✅ Part de l'admin (94%)
        // Trouver l'admin principal via isMainAdmin
-const mainAdmin = await User.find({
+const mainAdmins = await User.find({
   $or: [
     { isTheOwner: true },
     { isTheSuperAdmin: true }
   ]
 }).session(session);
 
-if (mainAdmin) {
-    const currentAdminDividendeCents = Math.round((mainAdmin.dividende_actions || 0) * 100);
-    const newAdminDividendeCents = currentAdminDividendeCents + adminShareCents;
-    mainAdmin.dividende_actions = newAdminDividendeCents / 100;
-    await mainAdmin.save({ session });
+if (mainAdmins && mainAdmins.length > 0) {
+    for (const admin of mainAdmins) {
+        const currentAdminDividendeCents = Math.round((admin.dividende_actions || 0) * 100);
+        const newAdminDividendeCents = currentAdminDividendeCents + adminShareCents;
+        admin.dividende_actions = newAdminDividendeCents / 100;
+        await admin.save({ session });
+    }
 }
 
         // Confirmation
