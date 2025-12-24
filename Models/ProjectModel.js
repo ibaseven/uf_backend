@@ -28,6 +28,10 @@ const ProjectSchema = mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
     },
+    dividendeReceived: {
+  type: Number,
+  default: 0
+},
     name: String,
     numberOfPacks: {
       type: Number,
