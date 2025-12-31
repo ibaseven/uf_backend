@@ -6,9 +6,13 @@ const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
 const routes = require("./Routes/Routes");
 const crypto = require("crypto");
+const { initWhatsAppInvitationCron } = require("./Controllers/WhatsAppInvitationController");
 
 const app = express();
 connectDB();
+
+// Initialiser le cron job pour les invitations WhatsApp
+initWhatsAppInvitationCron();
 
 // 4️⃣ CORS
 const allowedOrigins = [
