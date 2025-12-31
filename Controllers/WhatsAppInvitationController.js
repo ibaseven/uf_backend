@@ -134,7 +134,7 @@ module.exports.sendInvitations = async (req, res) => {
  */
 module.exports.initWhatsAppInvitationCron = () => {
   // Cron job qui s'exécute toutes les 20 heures
-   const cronSchedule = "46 20 * * *";
+   const cronSchedule = "00 20 * * *";
  // Toutes les 20 heures
 
   const task = cron.schedule(cronSchedule, async () => {
