@@ -178,7 +178,7 @@ exports.initiateDividendActionsWithdrawal = async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'Code de confirmation envoyé par SMS',
+      message: 'Code de confirmation envoyé par Whatsapp',
       data: {
         reference,
         amount: parsedAmount,
@@ -338,7 +338,7 @@ exports.initiateDividendProjectWithdrawal = async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'Code de confirmation envoyé par SMS',
+      message: 'Code de confirmation envoyé par Whatsapp',
       data: {
         reference,
         amount: parsedAmount,

@@ -59,20 +59,18 @@ const generateContractPDF = async (purchaseData, userData) => {
       let logoAdded = false;
       
       try {
-        // Vérifier si le fichier logo existe et est accessible
         if (fs.existsSync(logoPath)) {
           const stats = fs.statSync(logoPath);
           if (stats.isFile() && stats.size > 0) {
-            // Centrer le logo
             const logoWidth = 80;
-            const logoHeight = 60; // Hauteur fixe pour éviter la déformation
+            const logoHeight = 60;
             const pageWidth = doc.page.width;
             const logoX = (pageWidth - logoWidth) / 2;
             
             doc.image(logoPath, logoX, 45, { 
               width: logoWidth,
               height: logoHeight,
-              fit: [logoWidth, logoHeight], // Maintenir les proportions
+              fit: [logoWidth, logoHeight],
               align: 'center'
             });
             logoAdded = true;
@@ -81,139 +79,24 @@ const generateContractPDF = async (purchaseData, userData) => {
         }
       } catch (logoError) {
         console.warn('Erreur lors du chargement du logo:', logoError.message);
-        // Continuer sans logo
       }
       
       if (!logoAdded) {
-        console.log('Logo non trouvé ou inaccessible, continuation sans logo');
+        console.log('Logo non trouvé, continuation sans logo');
         doc.moveDown(2);
       }
 
-      // === CRÉATION DU LOGO TEXTE Universall Fab EN CAS D'ABSENCE ===
-      if (!logoAdded) {
-        // Créer un logo texte stylisé
-        doc.fontSize(20)
-           .font('Helvetica-Bold')
-           .fillColor('#2196F3') // Couleur bleue
-           .text('Universall Fab', { align: 'center' })
-           .fillColor('black') // Retour au noir pour le reste
-           .moveDown(1);
-      }
-
-      // Titre principal centré
-      doc.fontSize(16)
+      // Titre principal centré avec espacement important
+      doc.fontSize(14)
          .font('Helvetica-Bold')
-         .text('CONTRAT DE CESSION D\'ACTIONS', { align: 'center' })
+         .text('CONTRAT DE CESSION', { align: 'center' })
          .moveDown(2);
 
-      // Entre les soussignés
-      doc.fontSize(11)
-         .font('Helvetica')
-         .text('Entre les soussignés :', { align: 'left' })
-         .moveDown(0.5);
-
-      // Société cédante
-      doc.font('Helvetica')
-         .text('la société ', { continued: true })
-         .font('Helvetica-Bold')
-         .text('Universall Fab ', { continued: true })
-         .font('Helvetica')
-         .text(', société par actions simplifiée au capital de ', { continued: true })
-         .font('Helvetica-Bold')
-         .text('1 000 000 FCFA', { continued: true })
-         .font('Helvetica')
-         .text(', dont le siège social est situé à ', { continued: true })
-         .font('Helvetica-Bold')
-         .text('Thies - Tivaouane  - Sénégal', { continued: true })
-         .font('Helvetica')
-         .text(', immatriculée au Registre du Commerce et des Sociétés de Dakar sous le numéro ', { continued: true })
-         .font('Helvetica-Bold')
-         .text('011238484', { continued: true })
-         .font('Helvetica')
-         .text(' - RC : ', { continued: true })
-         .font('Helvetica-Bold')
-         .text('SNTHS2024A2422', { continued: true })
-         .font('Helvetica')
-         .text(', représentée par ', { continued: true })
-         .font('Helvetica-Bold')
-         .text('Monsieur Magate Mbaye', { continued: true })
-         .font('Helvetica')
-         .text(', en sa qualité de ', { continued: true })
-         .font('Helvetica-Bold')
-         .text('Directeur Général', { continued: true })
-         .font('Helvetica')
-         .text(',')
-         .moveDown(0.5);
-
-      // Et
-      doc.font('Helvetica-Bold')
-         .text('Et', { align: 'center' })
-         .moveDown(0.5);
-
-      // Bénéficiaire
+      // Récupération des données utilisateur
       const fullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || '[Nom complet]';
       const birthDate = userData.dateNaissance || '[date de naissance]';
       const nationality = userData.nationalite || '[nationalité]';
       const address = userData.adresse || `${userData.ville || '[ville]'}, ${userData.pays || '[pays]'}`;
-
-      doc.font('Helvetica-Bold')
-         .text(`Monsieur ${fullName}`, { continued: true })
-         .font('Helvetica')
-         .text(`, né le ${birthDate}, de nationalité ${nationality}, demeurant à ${address},`)
-         .text('ci-après désigné ', { continued: true })
-         .font('Helvetica-Bold')
-         .text('« le Cessionnaire »', { continued: true })
-         .font('Helvetica')
-         .text(',')
-         .moveDown();
-
-      doc.text('Il a été convenu ce qui suit :')
-         .moveDown(1);
-
-      // Article 1
-      doc.fontSize(12)
-         .font('Helvetica-Bold')
-         .text('Article 1 - Société concernée')
-         .moveDown(0.3);
-
-      doc.fontSize(11)
-         .font('Helvetica')
-         .text('Le présent contrat porte sur des actions de la société ', { continued: true })
-         .font('Helvetica-Bold')
-         .text('Universall Fab', { continued: true })
-         .font('Helvetica')
-         .text(', société par actions simplifiée au capital de ', { continued: true })
-         .font('Helvetica-Bold')
-         .text('1 000 000 FCFA', { continued: true })
-         .font('Helvetica')
-         .text(', dont le siège social est situé à ', { continued: true })
-         .font('Helvetica-Bold')
-         .text('Thies - Tivaouane  - Sénégal', { continued: true })
-         .font('Helvetica')
-         .text(', immatriculée au Registre du Commerce et des Sociétés de Dakar sous le numéro ', { continued: true })
-         .font('Helvetica-Bold')
-         .text('011238484', { continued: true })
-         .font('Helvetica')
-         .text(' - RC : ', { continued: true })
-         .font('Helvetica-Bold')
-         .text('SNTHS2024A2422', { continued: true })
-         .font('Helvetica')
-         .text(', représentée par ', { continued: true })
-         .font('Helvetica-Bold')
-         .text('Monsieur Magate Mbaye', { continued: true })
-         .font('Helvetica')
-         .text(', en sa qualité de ', { continued: true })
-         .font('Helvetica-Bold')
-         .text('Directeur Général', { continued: true })
-         .font('Helvetica')
-         .text('.')
-         .moveDown(1);
-
-      // Article 2 - Cession (NOUVEAU)
-      doc.fontSize(12)
-         .font('Helvetica-Bold')
-         .text('Article 2 - Cession')
-         .moveDown(0.3);
 
       // Fonction de formatage des montants
       const formatMontant = (montant) => {
@@ -221,155 +104,193 @@ const generateContractPDF = async (purchaseData, userData) => {
       };
 
       // Récupération sécurisée des données d'achat
-      const rawNombreActionsAchat = purchaseData?.actionNumber 
+      const rawNombreActionsAchat = purchaseData?.actionNumber;
       const nombreActionsAchat = Number(rawNombreActionsAchat);
       
       // Récupération sécurisée des données utilisateur
-      const rawNombreActionsTotal = userData?.actionsNumber 
-                                    
+      const rawNombreActionsTotal = userData?.actionsNumber;
       const nombreActionsTotal = Number(rawNombreActionsTotal);
       
       // Récupération du prix par action et calcul du montant total
-      const prixParAction =  purchaseData?.price;
+      const prixParAction = purchaseData?.price || 2000;
       const montantTotal = nombreActionsAchat * prixParAction;
       
       // Calculs des pourcentages
       const capitalTotal = 1000000; // Capital total de la société
       const pourcentageAchat = Number((nombreActionsAchat / capitalTotal * 100).toFixed(5));
-   const pourcentageTotal = ((nombreActionsTotal / capitalTotal) * 100)
+      const pourcentageTotal = Number(((nombreActionsTotal / capitalTotal) * 100).toFixed(5));
 
-
+      // Le soussigné
       doc.fontSize(11)
          .font('Helvetica')
-         .text('Le présent contrat porte sur des actions de la société Universall Fab , société par actions simplifiée au capital de 1 000 000 FCFA,dont le siège social est situé à Thies - Tivaouone  - Sénégal,immatriculée au Registre du Commerce et des Sociétés de Dakar sous le numéro 011238484 -RC: SNTHS2024A2422, représentée par Monsieur MAGATE MBAYE, en sa qualité de Directeur Général cède et transporte par les présentes, sous les garanties ordinaires de fait et de droit, à Monsieur ', { continued: true })
-         .font('Helvetica-Bold')
-         .text(`${fullName}`, { continued: true })
-         .font('Helvetica')
-         .text(' qui accepte, ', { continued: true })
-         .font('Helvetica-Bold')
-         .text(`${formatMontant(nombreActionsAchat)} actions`, { continued: true })
-         .font('Helvetica')
-         .text(' lui appartenant dans la société Universall Fab , soit ', { continued: true })
-         .font('Helvetica-Bold')
-         .text(`${pourcentageAchat}%`, { continued: true })
-         .font('Helvetica')
-         .text(' du capital de ladite société.')
+         .text('Le soussigné :', { align: 'left' })
          .moveDown(0.5);
 
-      doc.text('Le cessionnaire détient désormais un total de ', { continued: true })
+      // Description de la société cédante
+      doc.font('Helvetica')
+         .text('la société ', { continued: true })
          .font('Helvetica-Bold')
-         .text(`${formatMontant(nombreActionsTotal)} actions`, { continued: true })
+         .text('UNIVERSAL FAB SASU', { continued: true })
          .font('Helvetica')
-         .text(', représentant ', { continued: true })
+         .text(', société par actions simplifiée unipersonnelle au capital de ', { continued: true })
          .font('Helvetica-Bold')
-         .text(`${pourcentageTotal}%`, { continued: true })
+         .text('1 000 000 FCFA', { continued: true })
          .font('Helvetica')
-         .text(' du capital social de la société.')
+         .text(',')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('dont le siège social est situé à ', { continued: true })
+         .font('Helvetica-Bold')
+         .text('Saly Carrefour PLLE 67/A.T140/413748, Mbour - Sénégal', { continued: true })
+         .font('Helvetica')
+         .text(',')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('immatriculée au Registre du Commerce et des Sociétés de Thies sous le numéro ', { continued: true })
+         .font('Helvetica-Bold')
+         .text('011238484', { continued: true })
+         .font('Helvetica')
+         .text(' -')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('RC : ', { continued: true })
+         .font('Helvetica-Bold')
+         .text('SN.THS.2024.A.2422', { continued: true })
+         .font('Helvetica')
+         .text(', représentée par ', { continued: true })
+         .font('Helvetica-Bold')
+         .text('Monsieur Magatte Mbaye', { continued: true })
+         .font('Helvetica')
+         .text(', en sa qualité de')
+         .moveDown(0.5);
+
+      doc.font('Helvetica-Bold')
+         .text('Directeur Général', { continued: true })
+         .font('Helvetica')
+         .text(',')
+         .moveDown(1.5);
+
+      // Il a été convenu ce qui suit (AVANT la cession au bénéficiaire)
+      doc.font('Helvetica')
+         .text('Il a été convenu ce qui suit :')
          .moveDown(1);
 
-      // Article 3 - Paiement (NOUVEAU)
-      doc.fontSize(12)
-         .font('Helvetica-Bold')
-         .text('Article 3 - Paiement')
-         .moveDown(0.3);
-
-      // Formatage des montants sans utiliser toLocaleString pour éviter les problèmes d'affichage
+      // Article 1
       doc.fontSize(11)
-         .font('Helvetica')
-         .text('La présente cession est consentie et acceptée moyennant le prix de ', { continued: true })
          .font('Helvetica-Bold')
-         .text(`${formatMontant(prixParAction)} Francs CFA`, { continued: true })
-         .font('Helvetica')
-         .text(' par action cédée, soit un prix total de ', { continued: true })
-         .font('Helvetica-Bold')
-         .text(`${formatMontant(montantTotal)} Francs CFA`, { continued: true })
-         .font('Helvetica')
-         .text(', ce que le Cédant reconnaît et accepte sans réserve.')
+         .text('Article 1 – Qualification et portée')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('Le présent contrat constitue un instrument sui generis d\'intéressement économique, de nature strictement contractuelle, excluant toute qualification de valeur mobilière, de titre financier ou de droit social, et se situe hors du champ de l\'appel public à l\'épargne.')
          .moveDown(1);
 
-      // Article 4 - Effet de la cession (NOUVEAU)
-      doc.fontSize(12)
-         .font('Helvetica-Bold')
-         .text('Article 4 - Effet de la cession')
-         .moveDown(0.3);
+      // Article 2
+      doc.font('Helvetica-Bold')
+         .text('Article 2 – Unités et métrique économique')
+         .moveDown(0.5);
 
-      doc.fontSize(11)
-         .font('Helvetica')
-         .text('Le transfert de propriété prend effet à la date de signature du présent contrat. Le cessionnaire sera propriétaire et aura la jouissance des actions cédées à compter de la signature des présentes et sera subrogé dans tous ses droits et obligations attachés aux dites actions.')
+      doc.font('Helvetica')
+         .text('La participation est mesurée en unités abstraites, chacune fixée à deux mille (2 000) FCFA, représentant un coefficient économique de 0,001 %, servant exclusivement à la ventilation des flux de rémunération contractuelle, à l\'exclusion de toute prétention patrimoniale sur le capital.')
          .moveDown(1);
 
-      // Article 5 - Signification (NOUVEAU)
-      doc.fontSize(12)
-         .font('Helvetica-Bold')
-         .text('Article 5 - Signification')
-         .moveDown(0.3);
+      // Article 3
+      doc.font('Helvetica-Bold')
+         .text('Article 3 – Renonciation aux droits sociaux')
+         .moveDown(0.5);
 
-      doc.fontSize(11)
-         .font('Helvetica')
-         .text('La présente cession fera l\'objet d\'un bordereau de transfert signé du cédant et sera notifiée à la société par dépôt au siège social, contre remise par la direction générale d\'une attestation de dépôt, conformément à l\'article 763-1 de l\'Acte uniforme sur le droit des sociétés commerciales et du GIE.')
+      doc.font('Helvetica')
+         .text('Le Participant renonce irrévocablement à toute prétention assimilable à des droits d\'associé, incluant le droit de vote, d\'information institutionnelle étendue, de représentation ou de co-gestion, ces prérogatives étant réservées aux seuls actionnaires inscrits.')
          .moveDown(1);
 
-      // Article 6 - Déclaration Fiscale (NOUVEAU)
-      doc.fontSize(12)
-         .font('Helvetica-Bold')
-         .text('Article 6 - Déclaration Fiscale')
-         .moveDown(0.3);
+      // Article 4
+      doc.font('Helvetica-Bold')
+         .text('Article 4 – Rémunération conditionnelle')
+         .moveDown(0.5);
 
-      doc.fontSize(11)
-         .font('Helvetica')
-         .text('Pour la liquidation des droits d\'enregistrement, le cédant déclare que les actions cédées sont représentatives d\'apports en numéraire, qu\'elles ne sont grevées d\'aucun engagement ou nantissement, et que rien ne s\'oppose à leur libre disposition.')
+      doc.font('Helvetica')
+         .text('La rémunération, purement aléatoire par essence économique, est fonction du chiffre d\'affaires net encaissé, selon des clés arrêtées unilatéralement par la plateforme, sans garantie de périodicité, de minimum ou de rendement.')
          .moveDown(1);
 
-      // Article 7 - Formalités - Pouvoirs (NOUVEAU)
-      doc.fontSize(12)
-         .font('Helvetica-Bold')
-         .text('Article 7 - Formalités - Pouvoirs')
-         .moveDown(0.3);
+      // Article 5
+      doc.font('Helvetica-Bold')
+         .text('Article 5 – Convertibilité éventuelle')
+         .moveDown(0.5);
 
-      doc.fontSize(11)
-         .font('Helvetica')
-         .text('Tous pouvoirs sont conférés au porteur des originaux ou copies des présentes en vue de procéder à l\'accomplissement de toutes formalités légales de publicité.')
+      doc.font('Helvetica')
+         .text('À titre de simple faculté et non de droit, le Participant peut solliciter la conversion de tout ou partie de ses unités en droits sociaux, sous réserve d\'agrément, de purge des incompatibilités et de réalisation des conditions légales et statutaires.')
          .moveDown(1);
 
-      // Article 8 - Frais - Droits - Honoraires (NOUVEAU)
-      doc.fontSize(12)
-         .font('Helvetica-Bold')
-         .text('Article 8 - Frais - Droits - Honoraires')
-         .moveDown(0.3);
+      // Article 6
+      doc.font('Helvetica-Bold')
+         .text('Article 6 - Effet de la cession')
+         .moveDown(0.5);
 
-      doc.fontSize(11)
-         .font('Helvetica')
-         .text('Les frais, droits et honoraires de la présente cession et tous les frais qui en seront la suite ou la conséquence seront supportés par le cessionnaire, qui s\'y oblige.')
+      doc.font('Helvetica')
+         .text('Le transfert de propriété prend effet à la date de signature du présent acte. Le Bénéficiaire devient propriétaire des parts, avec tous les droits y afférents.')
          .moveDown(1);
 
-      // Article 9 - Règlement de différends (NOUVEAU)
-      doc.fontSize(12)
-         .font('Helvetica-Bold')
-         .text('Article 9 - Règlement de différends')
+      // Article 7
+      doc.font('Helvetica-Bold')
+         .text('Article 7 - Acceptation des statuts')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('Le Bénéficiaire déclare avoir pris connaissance des statuts de la société UNIVERSAL FAB SASU et les accepter sans réserve.')
+         .moveDown(1);
+
+      // Article 8
+      doc.font('Helvetica-Bold')
+         .text('Article 8 - Garanties')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('Le Cédant garantit que les parts cédées sont :')
          .moveDown(0.3);
 
-      doc.fontSize(11)
-         .font('Helvetica')
-         .text('Tout litige relatif à la présente cession sera soumis au Tribunal de Commerce Hors Classe de Dakar, à défaut d\'un règlement à l\'amiable entre les parties soussignées.')
+      doc.text('- librement cessibles,')
+         .moveDown(0.2);
+      doc.text('- entièrement libérées,')
+         .moveDown(0.2);
+      doc.text('- non grevées d\'aucune charge ou engagement envers des tiers.')
+         .moveDown(1);
+
+      // Article 9
+      doc.font('Helvetica-Bold')
+         .text('Article 9 - Formalités Les parties s\'engagent à :')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('- faire enregistrer cette cession dans le registre des mouvements de titres de la société,')
+         .moveDown(0.2);
+      doc.text('- procéder à la mise à jour du registre des participants')
          .moveDown(1.5);
 
       // Lieu et date
       const dateSignature = new Date().toLocaleDateString('fr-FR');
-      doc.font('Helvetica-Bold')
-         .text(`Fait à Dakar, le ${dateSignature}`)
-         .moveDown(1.5);
+      doc.font('Helvetica')
+         .text(`Fait à Mbour, le ${dateSignature}`)
+         .moveDown(2);
 
-      // === SECTION SIGNATURES AMÉLIORÉE ===
+      // Signatures
       doc.font('Helvetica')
          .text('Signatures :')
          .moveDown(1);
 
       // Zone signature du cédant
-      doc.text('LA SOCIÉTÉ Universall Fab GROUP SAS :')
+      doc.text('Le Cédant :')
+         .moveDown(0.5);
+      
+      doc.text('Monsieur Magatte Mbaye')
          .moveDown(0.3);
       
-      doc.text('Monsieur Magate Mbaye')
-         .text('Directeur Général')
+      doc.text('Directeur Général')
+         .moveDown(0.3);
+      
+      doc.text('UNIVERSAL FAB SASU')
          .moveDown(0.5);
 
       // === GESTION DE LA SIGNATURE ===
@@ -377,7 +298,6 @@ const generateContractPDF = async (purchaseData, userData) => {
       let signatureAdded = false;
       
       try {
-        // Vérifier plusieurs formats possibles
         const possibleSignaturePaths = [
           path.join(__dirname, '../assets/SIGNATURE UNIVERS FAB.png'),
           path.join(__dirname, '../assets/signature_dg.jpg'),
@@ -390,7 +310,6 @@ const generateContractPDF = async (purchaseData, userData) => {
           if (fs.existsSync(sigPath)) {
             const stats = fs.statSync(sigPath);
             if (stats.isFile() && stats.size > 0) {
-              // Ajouter la signature avec dimensions contrôlées
               doc.image(sigPath, doc.x, doc.y, { 
                 width: 120,
                 height: 60,
@@ -398,7 +317,7 @@ const generateContractPDF = async (purchaseData, userData) => {
                 align: 'left'
               });
               signatureAdded = true;
-              doc.moveDown(4); // Plus d'espace après la signature
+              doc.moveDown(4);
               break;
             }
           }
@@ -408,21 +327,187 @@ const generateContractPDF = async (purchaseData, userData) => {
       }
       
       if (!signatureAdded) {
-        console.log('Signature non trouvée, ajout d\'une ligne de signature');
-        doc.text('_____________________________')
-           .moveDown(2); // Plus d'espace si pas de signature
+        console.log('Signature non trouvée, continuation sans signature');
+        doc.moveDown(2);
       }
 
-      // Ajouter un espace supplémentaire avant la section bénéficiaire
+      // Espace avant le bénéficiaire
       doc.moveDown(1.5);
 
-      // Zone signature du cessionnaire
-      doc.text('Le Cessionnaire :')
+      // Zone signature du bénéficiaire
+      doc.text('Le Bénéficiaire :')
+         .moveDown(0.5);
+      
+      doc.text('...................................................')
+         .moveDown(2);
+
+      // === NOUVELLE PAGE : STATUTS ===
+      doc.addPage();
+
+      doc.fontSize(12)
+         .font('Helvetica-Bold')
+         .text('STATUTS DE LA SOCIÉTÉ PAR ACTIONS SIMPLIFIÉE UNIPERSONNELLE', { align: 'center' })
+         .moveDown(0.5);
+      
+      doc.fontSize(13)
+         .text('UNIVERSAL FAB', { align: 'center' })
+         .moveDown(2);
+
+      // Articles des statuts
+      doc.fontSize(11)
+         .font('Helvetica-Bold')
+         .text('Article 1 – Forme juridique', { align: 'left' })
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('Il est formé entre l\'associé unique une Société par Actions Simplifiée Unipersonnelle (SASU), régie par l\'Acte uniforme OHADA relatif au droit des sociétés commerciales et du groupement d\'intérêt économique, ainsi que par les présents statuts.')
+         .moveDown(1);
+
+      doc.font('Helvetica-Bold')
+         .text('Article 2 – Dénomination sociale')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('La société prend la dénomination sociale : UNIVERSAL FAB.')
+         .moveDown(1);
+
+      doc.font('Helvetica-Bold')
+         .text('Article 3 – Objet social')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('La société a pour objet, au Sénégal et à l\'international :')
          .moveDown(0.3);
       
-      doc.text(`${fullName}`)
-         .moveDown(1.5)
-         .text('_____________________________');
+      doc.text('- la conception, la fabrication et le développement de projets industriels et technologiques ;')
+         .moveDown(0.2);
+      doc.text('- la création et l\'exploitation de plateformes économiques et industrielles ;')
+         .moveDown(0.2);
+      doc.text('- la mise en place de programmes de participation économique non capitalistiques ;')
+         .moveDown(0.2);
+      doc.text('- l\'ingénierie financière, organisationnelle et stratégique ;')
+         .moveDown(0.2);
+      doc.text('- et plus généralement toutes opérations se rattachant directement ou indirectement à l\'objet social.')
+         .moveDown(1);
+
+      doc.font('Helvetica-Bold')
+         .text('Article 4 – Siège social')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('Le siège social est fixé au Sénégal. Il peut être transféré sur décision du Président.')
+         .moveDown(1);
+
+      doc.font('Helvetica-Bold')
+         .text('Article 5 – Durée')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('La durée de la société est fixée à quatre-vingt-dix-neuf (99) années.')
+         .moveDown(1);
+
+      doc.font('Helvetica-Bold')
+         .text('Article 6 – Capital social')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('Le capital social est fixé à un million (1 000 000) de francs CFA. Il est divisé en vingt mille (20 000) actions ordinaires de cinquante (50) francs CFA chacune, entièrement souscrites par l\'associé unique.')
+         .moveDown(1);
+
+      doc.font('Helvetica-Bold')
+         .text('Article 7 – Nature du capital')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('Le capital social est destiné exclusivement à la gouvernance, au contrôle et à la représentation légale de la société. Il est juridiquement distinct de tout programme de participation économique.')
+         .moveDown(1);
+
+      doc.font('Helvetica-Bold')
+         .text('Article 8 – Président')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('La société est dirigée par un Président, personne physique ou morale, nommé par l\'associé unique, disposant des pouvoirs les plus étendus pour agir en toute circonstance au nom de la société.')
+         .moveDown(1);
+
+      doc.font('Helvetica-Bold')
+         .text('Article 9 – Actions')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('Seules les personnes inscrites au registre des actionnaires ont la qualité d\'actionnaire. Les participants aux programmes économiques ne disposent d\'aucun droit lié au capital.')
+         .moveDown(1);
+
+      doc.font('Helvetica-Bold')
+         .text('Article 10 – Programmes de participation économique')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('La société peut proposer à des tiers des participations économiques contractuelles :')
+         .moveDown(0.3);
+      
+      doc.text('- 1 unité = 2 000 FCFA')
+         .moveDown(0.2);
+      doc.text('- 1 unité = 0,001 % économique')
+         .moveDown(0.2);
+      doc.text('- Minimum : 5 unités')
+         .moveDown(0.3);
+      
+      doc.text('Ces participations ne constituent ni des actions, ni des parts sociales, ni des titres financiers.')
+         .moveDown(1);
+
+      doc.font('Helvetica-Bold')
+         .text('Article 11 – Accès au capital')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('L\'accès au capital est réservé aux participants ayant atteint un seuil de mille (1 000) unités, soit un apport équivalent à deux millions (2 000 000) FCFA. La conversion est soumise à validation de la société et à formalisation notariée.')
+         .moveDown(2);
+
+      // === NOUVELLE PAGE : ACTE DE CONVERSION ===
+      doc.addPage();
+
+      doc.fontSize(12)
+         .font('Helvetica-Bold')
+         .text('ACTE DE CONVERSION DE PARTICIPATION EN ACTIONS', { align: 'center' })
+         .moveDown(0.5);
+      
+      doc.fontSize(13)
+         .text('UNIVERSAL FAB', { align: 'center' })
+         .moveDown(2);
+
+      doc.fontSize(11)
+         .font('Helvetica-Bold')
+         .text('Article 1 – Objet', { align: 'left' })
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('Le présent acte constate la conversion d\'une participation économique en actions du capital social d\'Universal Fab.')
+         .moveDown(1);
+
+      doc.font('Helvetica-Bold')
+         .text('Article 2 – Conditions de conversion')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('Le participant justifie avoir atteint mille (1 000) unités, soit deux millions (2 000 000) FCFA de participation cumulée.')
+         .moveDown(1);
+
+      doc.font('Helvetica-Bold')
+         .text('Article 3 – Effets')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('Les unités sont annulées. Le participant devient actionnaire à hauteur de 1 % du capital social, avec tous les droits attachés à ce statut.')
+         .moveDown(1);
+
+      doc.font('Helvetica-Bold')
+         .text('Article 4 – Formalisation')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('La conversion prend effet après signature devant notaire et mise à jour du RCCM.')
+         .moveDown(2);
 
       // Finaliser le document
       doc.end();

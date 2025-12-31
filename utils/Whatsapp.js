@@ -6,7 +6,7 @@ const TOKEN = process.env.ULTRAMSG_TOKEN;
 
 function formatPhoneNumber(telephone) {
   // Supprimer tous les caractères non numériques
-  let cleaned = telephone.replace(/\D/g, '');
+  let cleaned = telephone.replaceAll(/\D/g, '');
   
   // Validation de base - s'assurer que ce n'est pas vide
   if (!cleaned) {
@@ -14,7 +14,57 @@ function formatPhoneNumber(telephone) {
   }
   return cleaned;
 }
-module.exports.sendWhatsAppMessage=async(telephone, message) =>{
+module.exports.sendWhatsAppMessage=async(phoneNumber, message) =>{
+  try {
+    const formattedPhone = formatPhoneNumber(phoneNumber);
+    
+    const data = qs.stringify({
+      "token": TOKEN,
+      "to": formattedPhone,
+      "body": message
+    });
+    
+    const config = {
+      method: 'post',
+      url: `https://api.ultramsg.com/${INSTANCE_ID}/messages/chat`,
+      headers: { 
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      data: data
+    };
+    
+    const response = await axios(config);
+    return response.data;
+  } catch (error) {
+    console.error("Erreur d'envoi WhatsApp:", error);
+    throw error;
+  }
+}
+module.exports.sendWhatsAppDocument = async (phone, pdfUrl, caption) => {
+  try {
+    const data = qs.stringify({
+      token: TOKEN,
+      to: phone,
+      document: pdfUrl,
+      filename: "Contrat_Actions.pdf",
+      caption: caption
+    });
+
+    await axios.post(
+      `https://api.ultramsg.com/${INSTANCE_ID}/messages/document`,
+      data,
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+
+    console.log("✅ Document WhatsApp envoyé !");
+    return { success: true };
+  } catch (error) {
+    console.error("❌ Erreur envoi WhatsApp :", error.response?.data || error.message);
+    return { success: false };
+  }
+};
+
+/* module.exports.sendWhatsAppMessage=async(telephone, message) =>{
 try {
     const accountId = process.env.LAM_ACCOUNT_ID;
     const password = process.env.LAM_PASSWORD;
@@ -54,4 +104,4 @@ try {
     }
     throw error;
   }
-}
+} */

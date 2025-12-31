@@ -95,6 +95,10 @@ isTheSuperAdmin:{
 isTheOwner:{
   type: Boolean,
   default: false
+},
+whatsAppInvitationSent:{
+  type: Boolean,
+  default: false
 }
 })
 
