@@ -152,7 +152,7 @@ module.exports.createSingleUserWithRandomPassword = async (req, res) => {
     }
 
     const siteUrl = "https://actionuniversalfab.com/";
-    const whatsappGroupUrl = "https://chat.whatsapp.com/F90GE9Dblgx2eSdlqCQeTt";
+    const whatsappGroupUrl = "https://chat.whatsapp.com/LJ5ao94sDYPDyYzVsqU49r";
 
     // Générer un mot de passe aléatoire
     const randomPassword = generateRandomPassword(10);

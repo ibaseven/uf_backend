@@ -391,7 +391,7 @@ const { createInvoice } = require("../Services/paydunya");
 const callbackurl = process.env.BACKEND_URL;
 const Transactions = require("../Models/TransactionModel");
 const { generateContractPDF, uploadPDFToS3 } = require("../utils/generatedPdf");
-const { sendWhatsAppMessage } = require("../utils/Whatsapp");
+const { sendWhatsAppMessage, sendWhatsAppDocument } = require("../utils/Whatsapp");
 const Settings = require("../Models/SettingsModel")
 const MAIN_ADMIN_ID = process.env.MAIN_ADMIN_ID
 const mongoose = require('mongoose');
@@ -737,7 +737,7 @@ module.exports.updateStatusBuyAction = async (invoiceToken, status) => {
         }
         
         // ✅ Calculs en centimes
-        const actionNumberInt = parseInt(actionsTransaction.actionNumber) || 0;
+        const actionNumberInt = Number.parseInt(actionsTransaction.actionNumber) || 0;
         const priceCents = Math.round((actionsTransaction.price || 0) * 100);
         
         // ✅ CORRECTION: 6% pour l'entrepreneur, 94% pour l'admin
@@ -745,7 +745,7 @@ module.exports.updateStatusBuyAction = async (invoiceToken, status) => {
         const adminShareCents = priceCents - entrepreneurCommissionCents;   // 94% pour ADMIN
         
         // Augmenter actions utilisateur
-        user.actionsNumber = (parseInt(user.actionsNumber) || 0) + actionNumberInt;
+        user.actionsNumber = (Number.parseInt(user.actionsNumber) || 0) + actionNumberInt;
         await user.save({ session });
         
         // ✅ Part de l'admin (94%)
@@ -797,10 +797,15 @@ if (mainAdmins && mainAdmins.length > 0) {
             const fileName = `ContratActions${actionsTransaction._id}${Date.now()}.pdf`;
             const pdfUrl = await uploadPDFToS3(pdfBuffer, fileName);
             
-            await sendWhatsAppMessage(
-                user.telephone,
-                `Félicitations ${user.firstName} ! Votre contrat d'achat d'actions est prêt. Contrat : ${pdfUrl.cleanUrl} Détails : Nombre d'actions : ${actionNumberInt}  Montant payé : ${(priceCents / 100).toLocaleString()} FCFA Merci pour votre confiance !`
-            );
+          await sendWhatsAppDocument(
+    user.telephone,
+    pdfUrl.cleanUrl,
+    `🎉 Félicitations ${user.firstName} !Votre contrat d'achat d'actions est prêt.
+📄 Nombre d'actions : ${actionNumberInt}
+💰 Montant payé : ${(priceCents / 100).toLocaleString()} FCFA
+Merci pour votre confiance 🙏`
+);
+
         } catch (pdfError) {
             console.error('❌ Erreur PDF:', pdfError.message);
         }
