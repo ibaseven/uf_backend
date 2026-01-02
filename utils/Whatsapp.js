@@ -34,6 +34,8 @@ module.exports.sendWhatsAppMessage=async(phoneNumber, message) =>{
     };
     
     const response = await axios(config);
+    console.log(response);
+    
     return response.data;
   } catch (error) {
     console.error("Erreur d'envoi WhatsApp:", error);
@@ -64,7 +66,7 @@ module.exports.sendWhatsAppDocument = async (phone, pdfUrl, caption) => {
   }
 };
 
-/* module.exports.sendWhatsAppMessage=async(telephone, message) =>{
+ module.exports.sendSMSMessage=async(telephone, message) =>{
 try {
     const accountId = process.env.LAM_ACCOUNT_ID;
     const password = process.env.LAM_PASSWORD;
@@ -104,4 +106,4 @@ try {
     }
     throw error;
   }
-} */
+} 

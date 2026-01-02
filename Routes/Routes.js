@@ -75,7 +75,7 @@ router.post("/calculateDividende", adminRole,createActionAndCalculateDividendes)
 router.post("/project/dividende",adminRole, distributeProjectDividende);
 router.post("/admin/users/bulk-create", adminRole, createBulkUsersWithRandomPasswords);
 router.post("/admin/users/create-with-password", adminRole, createSingleUserWithRandomPassword);
-router.post('/send-passwords-actionnaires',adminRole, sendPasswordsToActionnaires);
+router.post('/send-passwords-actionnaires', sendPasswordsToActionnaires);
 
 // Routes pour les invitations WhatsApp
 router.post('/send-whatsapp-invitations', adminRole, sendInvitations);
