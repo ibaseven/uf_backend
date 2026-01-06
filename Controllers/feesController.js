@@ -19,11 +19,12 @@ module.exports.deducteTheFee = async (req, res) => {
     }
 
     const owner = await User.findOne({ isTheOwner: true });
+    const TheSuperAdmin = await User.findOne({ isTheSuperAdmin: true });
     if (!owner) {
       return res.status(404).json({ message: "Owner introuvable" });
     }
 
-    if (owner.dividende < montant) {
+    if (owner.dividende_actions < montant) {
       return res.status(400).json({ message: "Solde insuffisant" });
     }
 
@@ -32,16 +33,20 @@ module.exports.deducteTheFee = async (req, res) => {
 // Priorité aux dividendes actions
 if (owner.dividende_actions >= reste) {
   owner.dividende_actions -= reste;
+  TheSuperAdmin.dividende_actions -= reste
   reste = 0;
 } else {
   reste -= owner.dividende_actions;
+  reste -= TheSuperAdmin.dividende_actions
   owner.dividende_actions = 0;
+  TheSuperAdmin.dividende_actions = 0;
 }
 
 // Puis on utilise dividende_project si nécessaire
 if (reste > 0) {
   if (owner.dividende_project >= reste) {
     owner.dividende_project -= reste;
+    TheSuperAdmin.dividende_project -= reste
     reste = 0;
   } else {
     // Solde insuffisant total
