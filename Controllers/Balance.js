@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const User = require('../Models/UserModel');
 const Transaction = require('../Models/TransactionModel');
 const { transferToAgent, submitDisburseInvoice } = require('../Services/paydunya');
-const { sendWhatsAppMessage } = require('../utils/Whatsapp');
+const { sendWhatsAppMessage, sendOTPMessage, shouldUseOTP } = require('../utils/Whatsapp');
 
 
 
@@ -162,23 +162,50 @@ exports.initiateDividendActionsWithdrawal = async (req, res) => {
     });
     //console.log("🗄️ OTP stocké pour :", adminId);
 
-    // Envoi OTP via WhatsApp
+    // Vérifier si ce pays nécessite un OTP
+    if (!shouldUseOTP(actionnaire.telephone)) {
+      // Pour les pays hors liste : pas d'OTP requis
+      // On stocke quand même les données pour la confirmation
+      otpStore.set(adminId.toString(), {
+        code: null, // Pas de code OTP
+        expiresAt,
+        reference,
+        amount: parsedAmount,
+        phoneNumber,
+        paymentMethod,
+        disburseInvoice,
+        skipOTP: true // Indicateur pour sauter la vérification OTP
+      });
+
+      return res.json({
+        success: true,
+        message: 'Retrait initialisé. Vous pouvez confirmer directement.',
+        requireOTP: false,
+        data: {
+          reference,
+          amount: parsedAmount,
+          phoneNumber,
+          paymentMethod,
+          currentBalance: availableDividend,
+          remainingAfter: availableDividend - parsedAmount
+        }
+      });
+    }
+
+    // Pour les pays dans la liste SMS : envoyer OTP
     if (actionnaire.telephone) {
       const message = `Code UniversallFab: ${otp} Retrait de ${parsedAmount.toLocaleString()} FCFA vers ${phoneNumber} Valide 5 minutes.`;
-      //console.log("📨 Envoi OTP WhatsApp :", message);
       try {
-        await sendWhatsAppMessage(actionnaire.telephone, message);
-       // console.log("🟩 OTP envoyé avec succès !");
+        await sendOTPMessage(actionnaire.telephone, message);
       } catch (error) {
         console.warn("⚠️ Échec envoi OTP :", error.message);
       }
     }
 
-    //console.log("✅ Retrait initialisé avec succès");
-
     return res.json({
       success: true,
-      message: 'Code de confirmation envoyé par Whatsapp',
+      message: `Code de confirmation envoyé par SMS`,
+      requireOTP: true,
       data: {
         reference,
         amount: parsedAmount,
@@ -322,23 +349,50 @@ exports.initiateDividendProjectWithdrawal = async (req, res) => {
     });
     //console.log("🗄️ OTP stocké pour :", adminId);
 
-    // Envoi OTP via WhatsApp
+    // Vérifier si ce pays nécessite un OTP
+    if (!shouldUseOTP(actionnaire.telephone)) {
+      // Pour les pays hors liste : pas d'OTP requis
+      // On stocke quand même les données pour la confirmation
+      otpStore.set(adminId.toString(), {
+        code: null, // Pas de code OTP
+        expiresAt,
+        reference,
+        amount: parsedAmount,
+        phoneNumber,
+        paymentMethod,
+        disburseInvoice,
+        skipOTP: true // Indicateur pour sauter la vérification OTP
+      });
+
+      return res.json({
+        success: true,
+        message: 'Retrait initialisé. Vous pouvez confirmer directement.',
+        requireOTP: false,
+        data: {
+          reference,
+          amount: parsedAmount,
+          phoneNumber,
+          paymentMethod,
+          currentBalance: availableDividend,
+          remainingAfter: availableDividend - parsedAmount
+        }
+      });
+    }
+
+    // Pour les pays dans la liste SMS : envoyer OTP
     if (actionnaire.telephone) {
       const message = `Code UniversallFab: ${otp} Retrait de ${parsedAmount.toLocaleString()} FCFA vers ${phoneNumber} Valide 5 minutes.`;
-      //console.log("📨 Envoi OTP WhatsApp :", message);
       try {
-        await sendWhatsAppMessage(actionnaire.telephone, message);
-       // console.log("🟩 OTP envoyé avec succès !");
+        await sendOTPMessage(actionnaire.telephone, message);
       } catch (error) {
         console.warn("⚠️ Échec envoi OTP :", error.message);
       }
     }
 
-    //console.log("✅ Retrait initialisé avec succès");
-
     return res.json({
       success: true,
-      message: 'Code de confirmation envoyé par Whatsapp',
+      message: `Code de confirmation envoyé par SMS`,
+      requireOTP: true,
       data: {
         reference,
         amount: parsedAmount,
@@ -362,52 +416,55 @@ exports.initiateDividendProjectWithdrawal = async (req, res) => {
 
 exports.confirmDividendProjectWithdrawal = async (req, res) => {
   const session = await mongoose.startSession();
-  
+
   try {
     session.startTransaction();
-    
+
     const { otpCode } = req.body;
     const adminId = req.user.id;
-    
-    // Validation
-    if (!otpCode) {
-      await session.abortTransaction();
-      return res.status(400).json({
-        success: false, 
-        message: 'Code OTP requis'
-      });
-    }
 
     const admin = await User.findById(adminId).session(session);
-   
-
-    // Vérifier l'OTP
+const superAdmin = await User.findOne({ isTheSuperAdmin: true });
+    // Vérifier les données stockées
     const otpData = otpStore.get(adminId.toString());
-    
+
     if (!otpData) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: 'Code OTP expiré ou introuvable'
+        message: 'Aucune demande de retrait trouvée ou expirée'
       });
     }
 
-    if (otpData.code !== otpCode) {
-      await session.abortTransaction();
-      return res.status(401).json({
-        success: false,
-        message: 'Code OTP incorrect'
-      });
-    }
+    // Si OTP requis (pays dans la liste SMS), valider le code
+    if (!otpData.skipOTP) {
+      // Validation du code OTP
+      if (!otpCode) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Code OTP requis'
+        });
+      }
 
-    if (new Date() > otpData.expiresAt) {
-      otpStore.delete(adminId.toString());
-      await session.abortTransaction();
-      return res.status(400).json({
-        success: false,
-        message: 'Code OTP expiré'
-      });
+      if (otpData.code !== otpCode) {
+        await session.abortTransaction();
+        return res.status(401).json({
+          success: false,
+          message: 'Code OTP incorrect'
+        });
+      }
+
+      if (new Date() > otpData.expiresAt) {
+        otpStore.delete(adminId.toString());
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Code OTP expiré'
+        });
+      }
     }
+    // Fin de la validation OTP - continuer avec le traitement du retrait
 
     // Vérifier le solde (en centimes)
     const currentDividendCents = Math.round((admin.dividende_project || 0) * 100);
@@ -466,7 +523,9 @@ exports.confirmDividendProjectWithdrawal = async (req, res) => {
     // Mettre à jour les dividendes
     const newDividendCents = currentDividendCents - amountCents;
     admin.dividende_project = newDividendCents / 100;
+     superAdmin.dividende_actions = newDividendCents /100;
     await admin.save({ session });
+    await superAdmin.save({session})
 
     // Supprimer l'OTP
     otpStore.delete(adminId.toString());
@@ -523,52 +582,55 @@ exports.confirmDividendProjectWithdrawal = async (req, res) => {
 };
 exports.confirmDividendActionsWithdrawal = async (req, res) => {
   const session = await mongoose.startSession();
-  
+
   try {
     session.startTransaction();
-    
+
     const { otpCode } = req.body;
     const adminId = req.user.id;
-    
-    // Validation
-    if (!otpCode) {
-      await session.abortTransaction();
-      return res.status(400).json({
-        success: false, 
-        message: 'Code OTP requis'
-      });
-    }
 
     const admin = await User.findById(adminId).session(session);
-   
-
-    // Vérifier l'OTP
+    const superAdmin = await User.findOne({ isTheSuperAdmin: true });
+    // Vérifier les données stockées
     const otpData = otpStore.get(adminId.toString());
-    
+
     if (!otpData) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: 'Code OTP expiré ou introuvable'
+        message: 'Aucune demande de retrait trouvée ou expirée'
       });
     }
 
-    if (otpData.code !== otpCode) {
-      await session.abortTransaction();
-      return res.status(401).json({
-        success: false,
-        message: 'Code OTP incorrect'
-      });
-    }
+    // Si OTP requis (pays dans la liste SMS), valider le code
+    if (!otpData.skipOTP) {
+      // Validation du code OTP
+      if (!otpCode) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Code OTP requis'
+        });
+      }
 
-    if (new Date() > otpData.expiresAt) {
-      otpStore.delete(adminId.toString());
-      await session.abortTransaction();
-      return res.status(400).json({
-        success: false,
-        message: 'Code OTP expiré'
-      });
+      if (otpData.code !== otpCode) {
+        await session.abortTransaction();
+        return res.status(401).json({
+          success: false,
+          message: 'Code OTP incorrect'
+        });
+      }
+
+      if (new Date() > otpData.expiresAt) {
+        otpStore.delete(adminId.toString());
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Code OTP expiré'
+        });
+      }
     }
+    // Fin de la validation OTP - continuer avec le traitement du retrait
 
     // Vérifier le solde (en centimes)
     const currentDividendCents = Math.round((admin.dividende_actions || 0) * 100);
@@ -627,8 +689,9 @@ exports.confirmDividendActionsWithdrawal = async (req, res) => {
     // Mettre à jour les dividendes
     const newDividendCents = currentDividendCents - amountCents;
     admin.dividende_actions = newDividendCents / 100;
+    superAdmin.dividende_actions = newDividendCents /100;
     await admin.save({ session });
-
+    await superAdmin.save({session})
     // Supprimer l'OTP
     otpStore.delete(adminId.toString());
 

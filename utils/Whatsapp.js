@@ -66,17 +66,17 @@ module.exports.sendWhatsAppDocument = async (phone, pdfUrl, caption) => {
   }
 };
 
- module.exports.sendSMSMessage=async(telephone, message) =>{
+module.exports.sendSMSMessage=async(telephone, message) =>{
 try {
     const accountId = process.env.LAM_ACCOUNT_ID;
     const password = process.env.LAM_PASSWORD;
-    
+
     if (!accountId || !password) {
       throw new Error('LAM_ACCOUNT_ID et LAM_PASSWORD doivent être configurés dans .env');
     }
 
     const formattedPhone = formatPhoneNumber(telephone);
-    
+
     const payload = {
       accountid: accountId,
       password: password,
@@ -90,20 +90,54 @@ try {
         }
       ]
     };
-    
+
     const response = await axios.post('https://lamsms.lafricamobile.com/api', payload, {
       headers: {
         'Content-Type': 'application/json'
       }
     });
     //console.log(response);
-    
+
     return { success: true, response: response.data };
-    
+
   } catch (error) {
     if (error.response) {
       const responseText = error.response.data;
     }
+    throw error;
+  }
+}
+
+// Liste des indicatifs de pays pour lesquels on envoie des OTP par SMS
+// SEULEMENT ces pays nécessitent un OTP pour la sécurité
+const SMS_COUNTRY_CODES = [
+  '+221', '+223', '+224', '+225', '+226',
+  '+227', '+228', '+229', '+245', '+243',"221","223","224"
+];
+
+// Vérifie si le numéro de téléphone nécessite un OTP (pays dans la liste SMS)
+function shouldUseOTP(telephone) {
+  return SMS_COUNTRY_CODES.some(code => telephone.startsWith(code));
+}
+
+// Export de la fonction pour utilisation dans les controllers
+module.exports.shouldUseOTP = shouldUseOTP;
+
+// Fonction pour envoyer un OTP par SMS (seulement pour les pays dans la liste)
+module.exports.sendOTPMessage = async(telephone, message) => {
+  try {
+    if (shouldUseOTP(telephone)) {
+      // Envoyer par SMS pour les pays africains spécifiques
+      await module.exports.sendSMSMessage(telephone, message);
+      console.log(`📱 OTP envoyé par SMS à ${telephone}`);
+      return { channel: 'SMS', success: true, requireOTP: true };
+    } else {
+      // Pas d'OTP pour les autres pays - connexion directe
+      console.log(`✅ Pas d'OTP requis pour ${telephone} - connexion directe`);
+      return { channel: 'none', success: true, requireOTP: false };
+    }
+  } catch (error) {
+    console.error(`❌ Erreur lors de l'envoi de l'OTP à ${telephone}:`, error);
     throw error;
   }
 } 

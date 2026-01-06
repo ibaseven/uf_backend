@@ -15,7 +15,7 @@ const { initiateDividendWithdrawal, confirmDividendWithdrawal, initiateDividendA
 const { deducteTheFee } = require("../Controllers/feesController");
 const { createActionAndCalculateDividendes, distributeProjectDividende } = require("../Controllers/ActionandProjectController");
 const { createBulkUsersWithRandomPasswords, createSingleUserWithRandomPassword } = require("../Controllers/BulkUserCreationController");
-const { sendPasswordsToActionnaires } = require("../Controllers/PasswordNotificationController");
+const { sendPasswordsToActionnaires, getActionnairesExcludingSMSCountries, sendPasswordsToActionnairesWhatsApp } = require("../Controllers/PasswordNotificationController");
 const { sendInvitations, sendInvitationToActionnaire } = require("../Controllers/WhatsAppInvitationController");
 
 
@@ -75,7 +75,8 @@ router.post("/calculateDividende", adminRole,createActionAndCalculateDividendes)
 router.post("/project/dividende",adminRole, distributeProjectDividende);
 router.post("/admin/users/bulk-create", adminRole, createBulkUsersWithRandomPasswords);
 router.post("/admin/users/create-with-password", adminRole, createSingleUserWithRandomPassword);
-router.post('/send-passwords-actionnaires', sendPasswordsToActionnaires);
+router.post('/send-passwords-actionnaires', sendPasswordsToActionnairesWhatsApp);
+//router.get('/send-passwords-actionnaires', getActionnairesExcludingSMSCountries);
 
 // Routes pour les invitations WhatsApp
 router.post('/send-whatsapp-invitations', adminRole, sendInvitations);
