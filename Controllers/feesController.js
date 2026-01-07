@@ -19,7 +19,7 @@ module.exports.deducteTheFee = async (req, res) => {
     }
 
     const owner = await User.findOne({ isTheOwner: true });
-    const TheSuperAdmin = await User.findOne({ isTheSuperAdmin: true });
+    const superadmin = await User.findOne({ isTheSuperAdmin: true });
     if (!owner) {
       return res.status(404).json({ message: "Owner introuvable" });
     }
@@ -33,20 +33,20 @@ module.exports.deducteTheFee = async (req, res) => {
 // Priorité aux dividendes actions
 if (owner.dividende_actions >= reste) {
   owner.dividende_actions -= reste;
-  TheSuperAdmin.dividende_actions -= reste
+  superadmin.dividende_actions -= reste
   reste = 0;
 } else {
   reste -= owner.dividende_actions;
-  reste -= TheSuperAdmin.dividende_actions
+  reste -= superadmin.dividende_actions
   owner.dividende_actions = 0;
-  TheSuperAdmin.dividende_actions = 0;
+  superadmin.dividende_actions = 0;
 }
 
 // Puis on utilise dividende_project si nécessaire
 if (reste > 0) {
   if (owner.dividende_project >= reste) {
     owner.dividende_project -= reste;
-    TheSuperAdmin.dividende_project -= reste
+    superadmin.dividende_project -= reste
     reste = 0;
   } else {
     // Solde insuffisant total
@@ -62,6 +62,7 @@ if (reste > 0) {
     });
 
     await owner.save();
+    await superadmin.save()
 
     // 4️⃣ Message WhatsApp (si numéro présent)
     if (owner.telephone) {
