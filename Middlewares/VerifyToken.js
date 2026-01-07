@@ -77,7 +77,6 @@ const authenticateAdmin = (req, res, next) => {
     const userIdFromParams = req.params.id; // Adapter selon votre route (id, userId, etc.)
     req.userIdFromParams = userIdFromParams;
 
-    // ✅ Vérification optionnelle : l'ID du token correspond à celui des params
     if (req.user.id !== userIdFromParams) {
       return res.status(403).json({ message: 'middleware.auth.forbidden' });
     }
@@ -86,7 +85,7 @@ const authenticateAdmin = (req, res, next) => {
   });
 };
 
-// Middleware pour vérifier l'auth et le token JWT et recupérer  les informations de l'utlisateur connecté 
+// Middleware pour vérifier l'auth et le token JWT et recupérer  les informations de l'utlisateur connecté  
 const adminRole = (req, res, next) => {
     let token = req.headers.authorization;
     
