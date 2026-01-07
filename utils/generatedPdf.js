@@ -2,10 +2,13 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 const qs = require('qs');
-const AWS = require('aws-sdk');
-const s3 = new AWS.S3({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+
+const s3Client = new S3Client({
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
   region: process.env.AWS_REGION,
 });
 
@@ -17,10 +20,10 @@ const uploadPDFToS3 = async function (pdfBuffer, fileName) {
     Key: s3Key,
     Body: pdfBuffer,
     ContentType: 'application/pdf',
-   
   };
 
-  await s3.putObject(params).promise();
+  const command = new PutObjectCommand(params);
+  await s3Client.send(command);
 
   // URL propre accessible publiquement
   const cleanUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;

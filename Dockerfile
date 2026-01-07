@@ -1,8 +1,9 @@
-# Utiliser une image Node.js
-FROM node:18-alpine
+# Utiliser Node 20 (requis par certaines dépendances)
+FROM node:20-alpine
 
-# Installer les dépendances système nécessaires pour canvas
+# Installer les dépendances système + git (important)
 RUN apk add --no-cache \
+    git \
     python3 \
     make \
     g++ \
@@ -14,14 +15,16 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# Copier package.json et installer les dépendances
+# Copier package.json et package-lock.json
 COPY package*.json ./
-RUN npm install --production
+
+# Installer uniquement les dépendances de prod
+RUN npm install --omit=dev
 
 # Copier le reste du code source
 COPY . .
 
-# Exposer le port de l'application
+# Exposer le port
 EXPOSE 5000
 
 # Démarrer l'application
