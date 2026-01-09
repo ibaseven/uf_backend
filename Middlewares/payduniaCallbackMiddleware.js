@@ -93,6 +93,8 @@ const verifyPaydunyaCallback = (req, res, next) => {
         }
         
         const masterKey = process.env.PAYDUNYA_MASTER_KEY;
+        console.log(masterKey);
+        
         if (!masterKey) {
             console.error('❌ PAYDUNYA_MASTER_KEY non configurée');
             return res.status(500).json({ message: "Configuration serveur manquante" });
