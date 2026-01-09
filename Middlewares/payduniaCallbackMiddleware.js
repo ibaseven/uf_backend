@@ -1,8 +1,8 @@
 require("dotenv").config();
-const crypto = require('crypto');
-const { sha512 } = require('js-sha512');
-const rateLimit = require('express-rate-limit');
-const querystring = require('querystring');
+const crypto = require("crypto");
+const { sha512 } = require("js-sha512");
+const rateLimit = require("express-rate-limit");
+const querystring = require("querystring");
 
 // ✅ Rate limiting avec gestion IPv6 correcte
 const paydunyaCallbackLimiter = rateLimit({
@@ -12,7 +12,7 @@ const paydunyaCallbackLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req, res) => {
-        const ip = req.headers['cf-connecting-ip'] || req.ip;
+        const ip = req.headers["cf-connecting-ip"] || req.ip;
         return rateLimit.ipKeyGenerator(req, res, ip);
     }
 });
@@ -20,12 +20,12 @@ const paydunyaCallbackLimiter = rateLimit({
 // 🔐 Comparaison sécurisée des hash
 const secureCompareHash = (hash1, hash2) => {
     if (!hash1 || !hash2) return false;
-    if (typeof hash1 !== 'string' || typeof hash2 !== 'string') return false;
+    if (typeof hash1 !== "string" || typeof hash2 !== "string") return false;
     if (hash1.length !== 128 || hash2.length !== 128) return false;
 
     try {
-        const buf1 = Buffer.from(hash1, 'hex');
-        const buf2 = Buffer.from(hash2, 'hex');
+        const buf1 = Buffer.from(hash1, "hex");
+        const buf2 = Buffer.from(hash2, "hex");
         if (buf1.length !== 64 || buf2.length !== 64) return false;
         return crypto.timingSafeEqual(buf1, buf2);
     } catch (error) {
@@ -36,7 +36,7 @@ const secureCompareHash = (hash1, hash2) => {
 // 🔄 Convertit data[invoice][token] => data.invoice.token
 const unflattenPaydunyaData = (flatData) => {
     const result = {};
-    for (const [key, value] of Object.entries(flatData)) {
+    for (const [key, value] of Object.entries(flatData || {})) {
         const parts = key.match(/\w+/g);
         if (!parts) continue;
 
@@ -57,19 +57,19 @@ const verifyPaydunyaCallback = (req, res, next) => {
 
         // Support PHP / Guzzle / raw buffer
         if (Buffer.isBuffer(body)) {
-            body = querystring.parse(body.toString('utf8'));
+            body = querystring.parse(body.toString("utf8"));
         }
 
         if (Array.isArray(body)) {
             const bufferData = Buffer.from(body);
-            body = querystring.parse(bufferData.toString('utf8'));
+            body = querystring.parse(bufferData.toString("utf8"));
         }
 
         // Unflatten
         const unflattenedBody = unflattenPaydunyaData(body);
         body = unflattenedBody.data || unflattenedBody;
 
-        if (!body || typeof body !== 'object') {
+        if (!body || typeof body !== "object") {
             return res.status(400).json({ message: "Body invalide" });
         }
 
@@ -80,6 +80,11 @@ const verifyPaydunyaCallback = (req, res, next) => {
         const invoiceToken = body.invoice.token;
         const receivedHash = body.hash;
         const status = body.status;
+
+        console.log("📥 PayDunya callback reçu");
+        console.log("TOKEN:", invoiceToken);
+        console.log("HASH REÇU:", receivedHash);
+        console.log("MODE:", body.mode);
 
         if (!receivedHash) {
             return res.status(401).json({ message: "Hash manquant" });
@@ -92,27 +97,29 @@ const verifyPaydunyaCallback = (req, res, next) => {
         const masterKey = process.env.PAYDUNYA_MASTER_KEY;
 
         if (!masterKey) {
-            console.error('❌ PAYDUNYA_MASTER_KEY non configurée');
+            console.error("❌ PAYDUNYA_MASTER_KEY non configurée");
             return res.status(500).json({ message: "Configuration serveur manquante" });
         }
 
-        // ✅ CALCUL OFFICIEL PAYDUNYA
-        const expectedHash = sha512(masterKey + invoiceToken);
+        // ✅ FORMULES PAYDUNYA (on teste les 2 pour sandbox + live)
+        const hash1 = sha512(masterKey + invoiceToken);
+        const hash2 = sha512(invoiceToken + masterKey);
 
-        // 🔎 Logs de debug (tu peux les enlever après validation)
-        console.log("📥 PayDunya callback reçu");
-        console.log("TOKEN:", invoiceToken);
-        console.log("HASH REÇU:", receivedHash);
-        console.log("HASH CALCULÉ:", expectedHash);
-        console.log("MODE:", body.mode);
+        console.log("HASH CALCULÉ 1 (master+token):", hash1);
+        console.log("HASH CALCULÉ 2 (token+master):", hash2);
 
-        // 🔐 Vérification
-        if (!secureCompareHash(expectedHash, receivedHash)) {
+        const valid =
+            secureCompareHash(hash1, receivedHash) ||
+            secureCompareHash(hash2, receivedHash);
+
+        if (!valid) {
             console.warn(`⚠️ Hash invalide: ${invoiceToken}`);
             return res.status(401).json({ message: "Authentification échouée" });
         }
 
-        // ✅ Données validées
+        console.log("✅ Hash PayDunya validé");
+
+        // ✅ On attache les données vérifiées à la requête
         req.paydunya = {
             invoiceToken,
             status,
@@ -126,12 +133,10 @@ const verifyPaydunyaCallback = (req, res, next) => {
             fullPayload: body
         };
 
-        console.log("✅ Callback PayDunya authentifié avec succès");
-
         next();
 
     } catch (error) {
-        console.error('❌ Erreur vérification callback:', error);
+        console.error("❌ Erreur vérification callback:", error);
         return res.status(500).json({ message: "Erreur de vérification" });
     }
 };
