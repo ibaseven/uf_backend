@@ -209,7 +209,7 @@ const generateContractPDF = async (purchaseData, userData) => {
          .text('Le Participant renonce irrévocablement à toute prétention assimilable à des droits d\'associé, incluant le droit de vote, d\'information institutionnelle étendue, de représentation ou de co-gestion, ces prérogatives étant réservées aux seuls actionnaires inscrits.')
          .moveDown(1);
 
-      // Article 4
+      // Article 4hjfds
       doc.font('Helvetica-Bold')
          .text('Article 4 – Rémunération conditionnelle')
          .moveDown(0.5);
