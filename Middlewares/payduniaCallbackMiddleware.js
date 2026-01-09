@@ -1,3 +1,4 @@
+require("dotenv").config();
 const crypto = require('crypto');
 const { sha512 } = require('js-sha512');
 const rateLimit = require('express-rate-limit');
