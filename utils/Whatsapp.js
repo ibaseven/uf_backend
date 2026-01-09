@@ -34,7 +34,7 @@ module.exports.sendWhatsAppMessage=async(phoneNumber, message) =>{
     };
     
     const response = await axios(config);
-    console.log(response);
+   // console.log(response);
     
     return response.data;
   } catch (error) {
