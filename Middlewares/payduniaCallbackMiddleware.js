@@ -101,18 +101,12 @@ const verifyPaydunyaCallback = (req, res, next) => {
             return res.status(500).json({ message: "Configuration serveur manquante" });
         }
 
-        // ✅ FORMULES PAYDUNYA (on teste les 2 pour sandbox + live)
-        const hash1 = sha512(masterKey + invoiceToken);
-        const hash2 = sha512(invoiceToken + masterKey);
+        // ✅ ✅ FORMULE PAYDUNYA RÉELLE (prouvée par tes logs)
+        const expectedHash = sha512(masterKey);
 
-        console.log("HASH CALCULÉ 1 (master+token):", hash1);
-        console.log("HASH CALCULÉ 2 (token+master):", hash2);
+        console.log("HASH CALCULÉ:", expectedHash);
 
-        const valid =
-            secureCompareHash(hash1, receivedHash) ||
-            secureCompareHash(hash2, receivedHash);
-
-        if (!valid) {
+        if (!secureCompareHash(expectedHash, receivedHash)) {
             console.warn(`⚠️ Hash invalide: ${invoiceToken}`);
             return res.status(401).json({ message: "Authentification échouée" });
         }
