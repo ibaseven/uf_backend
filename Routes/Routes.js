@@ -10,7 +10,7 @@ const { getAllTransactionsByUser, getAllTransactions, getTransactionsByProcess }
 const { uploadImg } = require("../Middlewares/awsUpload");
 const { previewPdfImport } = require("../utils/test");
 const { updateActionPrice, getActionPrice } = require("../Controllers/SettingsController");
-const { payduniaCallbackLimiter, verifyPaydunyaCallback } = require("../Middlewares/payduniaCallbackMiddleware");
+const { payduniaCallbackLimiter, verifyPaydunyaCallback ,paydunyaCallbackLimiter} = require("../Middlewares/payduniaCallbackMiddleware");
 const { initiateDividendWithdrawal, confirmDividendWithdrawal, initiateDividendActionsWithdrawal, initiateDividendProjectWithdrawal, confirmDividendProjectWithdrawal, confirmDividendActionsWithdrawal } = require("../Controllers/Balance");
 const { deducteTheFee } = require("../Controllers/feesController");
 const { createActionAndCalculateDividendes, distributeProjectDividende } = require("../Controllers/ActionandProjectController");
@@ -39,7 +39,7 @@ router.get('/getMyProfile', authenticateUser, getMyProfile);
 router.post("/buyActions",authenticateUser,buyAction)
 router.post("/bulk-create-users",uploadPDF, bulkCreateUsersFromPDF);
 //router.post("/ipn",payduniaCallbackLimiter,handlePaymentCallback)
-router.post("/ipn",payduniaCallbackLimiter,verifyPaydunyaCallback,handlePaymentCallback)
+router.post("/ipn",paydunyaCallbackLimiter,verifyPaydunyaCallback,handlePaymentCallback)
 router.get("/getAllActionnaire",authenticateUser,getAllActionnaire)
 router.get("/getTheOwner",authenticateUser,getTheOwner)
 router.get("/getransactionbyuser",authenticateUser,getAllTransactionsByUser)
@@ -47,7 +47,7 @@ router.get("/getAllProject",authenticateUser,getAllProject)
 router.get("/getProjectByUser",authenticateUser,getProjectByUser)
 router.get("/getAllTransactions",authenticateUser,getAllTransactions)
 router.post('/bulk-import', uploadPDF, previewPdfImport);
-router.post("/ipnpayment",payduniaCallbackLimiter,verifyPaydunyaCallback,handleBuyActionsCallback)
+router.post("/ipnpayment",paydunyaCallbackLimiter,verifyPaydunyaCallback,handleBuyActionsCallback)
 //router.post("/ipnpayment",payduniaCallbackLimiter,handleBuyActionsCallback)
 router.post("/createAdmin",createAdmin)
 router.get("/get-user/:id",authenticateUser,getUserById);
