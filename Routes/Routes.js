@@ -38,8 +38,8 @@ router.post("/giveYourDividendToTheProject",authenticateUser,giveYourDividendToT
 router.get('/getMyProfile', authenticateUser, getMyProfile);
 router.post("/buyActions",authenticateUser,buyAction)
 router.post("/bulk-create-users",uploadPDF, bulkCreateUsersFromPDF);
-router.post("/ipn",payduniaCallbackLimiter,handlePaymentCallback)
-//router.post("/ipn",payduniaCallbackLimiter,verifyPaydunyaCallback,handlePaymentCallback)
+//router.post("/ipn",payduniaCallbackLimiter,handlePaymentCallback)
+router.post("/ipn",payduniaCallbackLimiter,verifyPaydunyaCallback,handlePaymentCallback)
 router.get("/getAllActionnaire",authenticateUser,getAllActionnaire)
 router.get("/getTheOwner",authenticateUser,getTheOwner)
 router.get("/getransactionbyuser",authenticateUser,getAllTransactionsByUser)
@@ -47,8 +47,8 @@ router.get("/getAllProject",authenticateUser,getAllProject)
 router.get("/getProjectByUser",authenticateUser,getProjectByUser)
 router.get("/getAllTransactions",authenticateUser,getAllTransactions)
 router.post('/bulk-import', uploadPDF, previewPdfImport);
-//router.post("/ipnpayment",payduniaCallbackLimiter,verifyPaydunyaCallback,handleBuyActionsCallback)
-router.post("/ipnpayment",payduniaCallbackLimiter,handleBuyActionsCallback)
+router.post("/ipnpayment",payduniaCallbackLimiter,verifyPaydunyaCallback,handleBuyActionsCallback)
+//router.post("/ipnpayment",payduniaCallbackLimiter,handleBuyActionsCallback)
 router.post("/createAdmin",createAdmin)
 router.get("/get-user/:id",authenticateUser,getUserById);
 router.get("/get-admin",adminRole,getUserBalance);
