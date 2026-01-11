@@ -158,3 +158,40 @@ module.exports.handleBuyActionsCallback = async (req, res) => {
     }
 };
 
+module.exports.confirmPaymentManually = async (req, res) => {
+  try {
+    const { invoiceToken, status } = req.body;
+
+    if (!invoiceToken) {
+      return res.status(400).json({
+        success: false,
+        message: "invoiceToken manquant"
+      });
+    }
+
+    const finalStatus = status || "completed";
+
+    const result = await updateStatusBuyAction(invoiceToken, finalStatus);
+
+    if (result.error) {
+      return res.status(result.statusCode || 500).json({
+        success: false,
+        message: result.message
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Paiement traité avec succès",
+      data: result
+    });
+
+  } catch (error) {
+    console.error("❌ Erreur confirmPaymentManually:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur serveur"
+    });
+  }
+};
+

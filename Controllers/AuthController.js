@@ -467,7 +467,9 @@ module.exports.createAdmin = async (req, res) => {
 };
 module.exports.getAllActionnaire = async (req, res) => {
   try {
-    const actionnaires = await User.find({ role: "actionnaire" });
+    const actionnaires = await User.find({ role: "actionnaire" })
+      .populate('parrain', 'firstName lastName telephone') 
+      .select('-password'); 
 
     return res.status(200).json({
       success: true,
@@ -480,7 +482,7 @@ module.exports.getAllActionnaire = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Erreur interne du serveur",
-      error
+      error: error.message
     });
   }
 };
@@ -968,8 +970,6 @@ module.exports.updateUser = async (req, res) => {
     const adminId = req.user?.id || req.userData?.id;
     const adminUser = await User.findById(adminId);
 
-   
-
     const { userId } = req.params;
     const updateFields = req.body;
 
@@ -1001,13 +1001,71 @@ module.exports.updateUser = async (req, res) => {
     // Étendre tous les champs envoyés
     let updateData = { ...updateFields };
 
- 
+    // Gérer le parrain si un numéro de téléphone est fourni
+    if (updateFields.parrain) {
+      // Rechercher le parrain par numéro de téléphone
+      const parrainExists = await User.findOne({ telephone: updateFields.parrain });
+      
+      if (!parrainExists) {
+        return res.status(404).json({
+          success: false,
+          message: "Aucun utilisateur trouvé avec ce numéro de téléphone"
+        });
+      }
+
+      // Vérifier qu'un utilisateur ne se parraine pas lui-même
+      if (parrainExists._id.toString() === userId) {
+        return res.status(400).json({
+          success: false,
+          message: "Un utilisateur ne peut pas être son propre parrain"
+        });
+      }
+
+      // Assigner l'ID du parrain (CORRIGÉ ICI)
+      updateData.parrain = parrainExists._id;
+    }
+
+    // Sauvegarder le mot de passe en clair pour l'envoi WhatsApp (si présent)
+    const plainPassword = updateFields.password;
+
+    // Hasher le mot de passe si présent
+    if (updateFields.password) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password = await bcrypt.hash(updateFields.password, salt);
+    }
+
     // Mise à jour finale
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       updateData,
       { new: true }
-    ).select("-password");
+    ).select("-password").populate('parrain', 'firstName lastName telephone');
+
+    // Envoyer le mot de passe par WhatsApp si un nouveau mot de passe a été défini
+if (plainPassword && updatedUser.telephone) {
+
+  let message = `Bonjour ${updatedUser.firstName} ${updatedUser.lastName}
+🔐 Nouveau mot de passe - Universal Fab
+Votre nouveau mot de passe est : ${plainPassword}
+Pour des raisons de sécurité, nous vous recommandons de le changer lors de votre prochaine connexion.
+🌐 Site web : https://actionuniversalfab.com/
+`;if (updatedUser.actionsNumber >= 5) {
+    message += `📱 WhatsApp : https://chat.whatsapp.com/LJ5ao94sDYPDyYzVsqU49r\n`;
+  }
+  message += `\nÉquipe Universal Fab`;
+  try {
+    await sendWhatsAppMessage(updatedUser.telephone, message);
+  } catch (whatsappError) {
+    console.error("Erreur envoi WhatsApp:", whatsappError);
+    return res.status(200).json({
+      success: true,
+      message: "Utilisateur mis à jour avec succès, mais l'envoi WhatsApp a échoué",
+      user: updatedUser,
+      whatsappError: "Le message n'a pas pu être envoyé"
+    });
+  }
+}
+
 
     return res.status(200).json({
       success: true,
@@ -1024,7 +1082,6 @@ module.exports.updateUser = async (req, res) => {
     });
   }
 };
-
 
 module.exports.changePassword = async (req, res) => {
   try {
