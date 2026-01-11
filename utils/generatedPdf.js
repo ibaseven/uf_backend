@@ -174,9 +174,57 @@ const generateContractPDF = async (purchaseData, userData) => {
          .text('Directeur Général', { continued: true })
          .font('Helvetica')
          .text(',')
-         .moveDown(1.5);
+         .moveDown(1);
 
-      // Il a été convenu ce qui suit (AVANT la cession au bénéficiaire)
+      // Cède à (Bénéficiaire) - AJOUT DES INFORMATIONS DU USER
+      doc.font('Helvetica')
+         .text('cède à ', { continued: true })
+         .font('Helvetica-Bold')
+         .text(`Monsieur ${fullName}`, { continued: true })
+         .font('Helvetica')
+         .text(`, né le ${birthDate}, de nationalité ${nationality}, demeurant à ${address},`)
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('ci-après désigné ', { continued: true })
+         .font('Helvetica-Bold')
+         .text('« le Bénéficiaire »', { continued: true })
+         .font('Helvetica')
+         .text(' ou ', { continued: true })
+         .font('Helvetica-Bold')
+         .text('« le Participant »', { continued: true })
+         .font('Helvetica')
+         .text(',')
+         .moveDown(0.5);
+
+      // Informations sur la cession avec les montants de l'achat
+      doc.font('Helvetica-Bold')
+         .text(`${formatMontant(nombreActionsAchat)} unités de participation`, { continued: true })
+         .font('Helvetica')
+         .text(' représentant ', { continued: true })
+         .font('Helvetica-Bold')
+         .text(`${pourcentageAchat}%`, { continued: true })
+         .font('Helvetica')
+         .text(' du capital économique, pour un montant total de ', { continued: true })
+         .font('Helvetica-Bold')
+         .text(`${formatMontant(montantTotal)} FCFA`, { continued: true })
+         .font('Helvetica')
+         .text('.')
+         .moveDown(0.5);
+
+      doc.font('Helvetica')
+         .text('Le Bénéficiaire détient désormais un total de ', { continued: true })
+         .font('Helvetica-Bold')
+         .text(`${formatMontant(nombreActionsTotal)} unités`, { continued: true })
+         .font('Helvetica')
+         .text(', représentant ', { continued: true })
+         .font('Helvetica-Bold')
+         .text(`${pourcentageTotal}%`, { continued: true })
+         .font('Helvetica')
+         .text(' de participation économique.')
+         .moveDown(1);
+
+      // Il a été convenu ce qui suit
       doc.font('Helvetica')
          .text('Il a été convenu ce qui suit :')
          .moveDown(1);
@@ -209,7 +257,7 @@ const generateContractPDF = async (purchaseData, userData) => {
          .text('Le Participant renonce irrévocablement à toute prétention assimilable à des droits d\'associé, incluant le droit de vote, d\'information institutionnelle étendue, de représentation ou de co-gestion, ces prérogatives étant réservées aux seuls actionnaires inscrits.')
          .moveDown(1);
 
-      // Article 4hjfds
+      // Article 4
       doc.font('Helvetica-Bold')
          .text('Article 4 – Rémunération conditionnelle')
          .moveDown(0.5);
@@ -341,8 +389,15 @@ const generateContractPDF = async (purchaseData, userData) => {
       doc.text('Le Bénéficiaire :')
          .moveDown(0.5);
       
-      doc.text('...................................................')
-         .moveDown(2);
+      doc.text(`${fullName}`)
+         .moveDown(0.3);
+      
+      doc.text(`Né le ${birthDate}`)
+         .moveDown(0.3);
+      
+      doc.text(`${nationality}`)
+         .moveDown(1.5)
+         .text('……………………………………………');
 
       // === NOUVELLE PAGE : STATUTS ===
       doc.addPage();
@@ -414,7 +469,7 @@ const generateContractPDF = async (purchaseData, userData) => {
          .moveDown(0.5);
 
       doc.font('Helvetica')
-         .text('Le capital social est fixé à un million (1 000 000) de francs CFA. Il est divisé en vingt mille (20 000) actions ordinaires de cinquante (50) francs CFA chacune, entièrement souscrites par l\'associé unique.')
+         .text('Le capital social est fixé à un million (1 000 000) de francs CFA, divisé en cent mille (100 000) actions ordinaires representant chacune 0,001% . Le capital est affecté exclusivement à la structuration des pouvoirs, de la gouvernance et de la représentation sociale, à l’exclusion de toute fonction de collecte participative.')
          .moveDown(1);
 
       doc.font('Helvetica-Bold')
