@@ -3,14 +3,14 @@ const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, verify
 const { participateProject, giveYourDividendToTheProject, getProjectByUser } = require("../Controllers/UserProjectController");
 const { authenticateTokenAndUserData, authenticateUser, adminRole, authenticateAdmin } = require("../Middlewares/VerifyToken");
 const { createProject, getAllProject, getProjectParticipants, decreaseParticipantPacks, increaseParticipantPacks, updateProject, deleteProject } = require("../Controllers/ProjectController");
-const { handlePaymentCallback, handleBuyActionsCallback } = require("../Controllers/paymentCallbackController");
+const { handlePaymentCallback, handleBuyActionsCallback, confirmPaymentManually } = require("../Controllers/paymentCallbackController");
 const { buyAction } = require("../Controllers/ActionController");
 const { bulkCreateUsersFromPDF, uploadPDF } = require("../utils/bulkCreateUsers");
 const { getAllTransactionsByUser, getAllTransactions, getTransactionsByProcess } = require("../Controllers/TransactionController");
 const { uploadImg } = require("../Middlewares/awsUpload");
 const { previewPdfImport } = require("../utils/test");
 const { updateActionPrice, getActionPrice } = require("../Controllers/SettingsController");
-const { payduniaCallbackLimiter, verifyPaydunyaCallback ,paydunyaCallbackLimiter} = require("../Middlewares/payduniaCallbackMiddleware");
+const { payduniaCallbackLimiter, verifyPaydunyaCallback, paydunyaCallbackLimiter } = require("../Middlewares/payduniaCallbackMiddleware");
 const { initiateDividendWithdrawal, confirmDividendWithdrawal, initiateDividendActionsWithdrawal, initiateDividendProjectWithdrawal, confirmDividendProjectWithdrawal, confirmDividendActionsWithdrawal } = require("../Controllers/Balance");
 const { deducteTheFee } = require("../Controllers/feesController");
 const { createActionAndCalculateDividendes, distributeProjectDividende } = require("../Controllers/ActionandProjectController");
@@ -82,5 +82,5 @@ router.post('/send-passwords-actionnaires', sendPasswordsToActionnaires);
 // Routes pour les invitations WhatsApp
 router.post('/send-whatsapp-invitations', adminRole, sendInvitations);
 router.post('/send-whatsapp-invitation/:userId', adminRole, sendInvitationToActionnaire);
-
+router.post("/confirm", confirmPaymentManually);
 module.exports=router

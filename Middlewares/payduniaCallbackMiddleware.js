@@ -81,10 +81,7 @@ const verifyPaydunyaCallback = (req, res, next) => {
         const receivedHash = body.hash;
         const status = body.status;
 
-        console.log("📥 PayDunya callback reçu");
-        console.log("TOKEN:", invoiceToken);
-        console.log("HASH REÇU:", receivedHash);
-        console.log("MODE:", body.mode);
+    
 
         if (!receivedHash) {
             return res.status(401).json({ message: "Hash manquant" });
@@ -104,14 +101,14 @@ const verifyPaydunyaCallback = (req, res, next) => {
         // ✅ ✅ FORMULE PAYDUNYA RÉELLE (prouvée par tes logs)
         const expectedHash = sha512(masterKey);
 
-        console.log("HASH CALCULÉ:", expectedHash);
+ 
 
         if (!secureCompareHash(expectedHash, receivedHash)) {
             console.warn(`⚠️ Hash invalide: ${invoiceToken}`);
             return res.status(401).json({ message: "Authentification échouée" });
         }
 
-        console.log("✅ Hash PayDunya validé");
+  
 
         // ✅ On attache les données vérifiées à la requête
         req.paydunya = {
