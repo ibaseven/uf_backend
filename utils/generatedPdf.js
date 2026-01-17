@@ -180,7 +180,7 @@ const generateContractPDF = async (purchaseData, userData) => {
       doc.font('Helvetica')
          .text('cède à ', { continued: true })
          .font('Helvetica-Bold')
-         .text(`Monsieur ${fullName}`, { continued: true })
+         .text(`M(me) ${fullName}`, { continued: true })
          .font('Helvetica')
          .text(`, né le ${birthDate}, de nationalité ${nationality}, demeurant à ${address},`)
          .moveDown(0.5);
