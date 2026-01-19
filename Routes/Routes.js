@@ -1,5 +1,6 @@
 const express = require("express");
-const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, verifyOTPAndSignIn, VerifyCreateAccountOTP, createAdmin, getAllActionnaire, getUserById, sendPasswordResetOTP, verifyOTPAndResetPassword, resendPasswordResetOTP, resetPassWord, updateOwnProfile, updateUser, getUserBalance, changePassword, getTheOwner, deleteUser, resendSignUpOTP, resendLoginOTP } = require("../Controllers/AuthController");
+const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, createAdmin, getAllActionnaire, getUserById, sendPasswordResetOTP, verifyOTPAndResetPassword, resetPassWord, updateOwnProfile, updateUser, getUserBalance, changePassword, getTheOwner, deleteUser } = require("../Controllers/AuthController");
+// ANCIEN CODE OTP - imports commentés: verifyOTPAndSignIn, VerifyCreateAccountOTP, resendPasswordResetOTP, resendSignUpOTP, resendLoginOTP
 const { participateProject, giveYourDividendToTheProject, getProjectByUser } = require("../Controllers/UserProjectController");
 const { authenticateTokenAndUserData, authenticateUser, adminRole, authenticateAdmin } = require("../Middlewares/VerifyToken");
 const { createProject, getAllProject, getProjectParticipants, decreaseParticipantPacks, increaseParticipantPacks, updateProject, deleteProject } = require("../Controllers/ProjectController");
@@ -26,10 +27,12 @@ const uploadFields = [
 
 router.post("/createAccount",CreateAccount)
 router.post("/login",SignAccount)
-router.post("/resend-login-otp", resendLoginOTP);
-router.post("/auth/verify-otp", verifyOTPAndSignIn);
-router.post("/createAccount/verify-otp", VerifyCreateAccountOTP);
-router.post("/resendOtpCreateAccount/verify-otp", resendSignUpOTP);
+// ANCIEN CODE OTP - COMMENTÉ
+// router.post("/resend-login-otp", resendLoginOTP);
+// router.post("/auth/verify-otp", verifyOTPAndSignIn);
+// router.post("/createAccount/verify-otp", VerifyCreateAccountOTP);
+// router.post("/resendOtpCreateAccount/verify-otp", resendSignUpOTP);
+// FIN ANCIEN CODE OTP
 router.get('/verify-token/:token', checkAndGetUserByToken);
 router.post('/change-password', changePassword);
 router.post("/createAnProject",uploadImg(uploadFields),createProject)
@@ -55,7 +58,9 @@ router.get("/get-admin",adminRole,getUserBalance);
 router.put('/updateProfile', authenticateUser, updateOwnProfile);
 router.post('/request-password-reset', sendPasswordResetOTP);
 router.post('/verify-reset-otp', verifyOTPAndResetPassword);
-router.post('/resend-reset-otp', resendPasswordResetOTP);
+// ANCIEN CODE OTP - COMMENTÉ
+// router.post('/resend-reset-otp', resendPasswordResetOTP);
+// FIN ANCIEN CODE OTP
 router.post("/reset-password/:resetToken", resetPassWord);
 router.put("/action/price", adminRole,updateActionPrice);
 router.get("/action/getPrice",getActionPrice);
