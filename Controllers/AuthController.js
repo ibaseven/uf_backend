@@ -25,39 +25,41 @@ module.exports.SignAccount= async(req,res)=>{
         if(!user){
             return res.status(400).json({message:"User Doesnt exist"})
         }
-      
+
          const comparePassword = bcrypt.compareSync(password, user.password);
           if (!comparePassword) {
             return res.status(401).json({ message: "Email or Password Incorrect" })
         }
-         //const token = createToken(user._id, user.email, user.role)
-         //res.status(200).json({ message: "Successfully connection", token, user });
- const otp = generateOTP();
-          otpStore[user._id] = {
-      code: otp,
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000)
-    };
-    //(`🗃️ OTP stocké pour l'utilisateur ${user._id} avec expiration à ${otpStore[user._id].expiresAt}`);
 
-    // Envoi du code via WhatsApp
-    try {
-      //(`📤 Envoi du code OTP par WhatsApp à ${user.telephone}`);
-      await sendWhatsAppMessage(
-        user.telephone,
-        `Votre code de vérification Universall Fab est: ${otp}. Il expire dans 5 minutes.`
-      );
+        // Connexion directe sans OTP
+        const token = createToken(user._id, user.email, user.role)
+        res.status(200).json({ message: "Successfully connection", token, user });
 
-      //("✅ OTP envoyé avec succès");
-      res.status(200).json({
-        message: "Un code de vérification a été envoyé à votre numéro WhatsApp",
-        userId: user._id,
-        requireOTP: true
-      });
+        /* ANCIEN CODE OTP - COMMENTÉ
+        const otp = generateOTP();
+        otpStore[user._id] = {
+          code: otp,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000)
+        };
 
-    } catch (msgError) {
-      console.error("📛 Erreur lors de l'envoi du message WhatsApp:", msgError);
-      res.status(500).json({ message: "Échec de l'envoi du code de vérification" });
-    }
+        // Envoi du code via WhatsApp
+        try {
+          await sendWhatsAppMessage(
+            user.telephone,
+            `Votre code de vérification Universall Fab est: ${otp}. Il expire dans 5 minutes.`
+          );
+
+          res.status(200).json({
+            message: "Un code de vérification a été envoyé à votre numéro WhatsApp",
+            userId: user._id,
+            requireOTP: true
+          });
+
+        } catch (msgError) {
+          console.error("📛 Erreur lors de l'envoi du message WhatsApp:", msgError);
+          res.status(500).json({ message: "Échec de l'envoi du code de vérification" });
+        }
+        FIN ANCIEN CODE OTP */
     } catch (error) {
         res.status(500).send({ message: "Internal Server Error", error });
     }
@@ -69,12 +71,41 @@ module.exports.CreateAccount = async (req, res) => {
     // Vérifie si le numéro existe déjà en BD
     const existingUser = await User.findOne({ telephone });
     if (existingUser) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Ce numéro est déjà enregistré." 
+        message: "Ce numéro est déjà enregistré."
       });
     }
 
+    // Création directe du compte sans OTP
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const newUser = await User.create({
+      telephone,
+      firstName,
+      lastName,
+      nationalite,
+      adresse,
+      ville,
+      pays,
+      cni,
+      password: hashedPassword,
+      dateNaissance,
+      role: "actionnaire",
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Compte créé avec succès",
+      user: {
+        id: newUser._id,
+        firstName: newUser.firstName,
+        telephone: newUser.telephone,
+      },
+    });
+
+    /* ANCIEN CODE OTP - COMMENTÉ
     // Génère un OTP
     const otp = generateOTP();
 
@@ -102,54 +133,52 @@ module.exports.CreateAccount = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      tempUserId: telephone, 
+      tempUserId: telephone,
       message: "Un code de vérification a été envoyé à votre numéro WhatsApp.",
       requireOTP: true,
     });
+    FIN ANCIEN CODE OTP */
   } catch (error) {
     console.error("Erreur CreateAccount:", error);
-    res.status(500).json({ 
-      success: false,  
-      message: "Erreur interne du serveur", 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      message: "Erreur interne du serveur",
+      error: error.message
     });
   }
 };
+/* ANCIEN CODE OTP - COMMENTÉ - VerifyCreateAccountOTP
 module.exports.VerifyCreateAccountOTP = async (req, res) => {
   try {
-    const { tempUserId, otpCode } = req.body;  // ← Changé "telephone" en "tempUserId" et "otp" en "otpCode"
-    
-    const telephone = tempUserId;  // tempUserId contient le numéro de téléphone
+    const { tempUserId, otpCode } = req.body;
 
-    // Vérifie si un OTP a été généré pour ce téléphone
+    const telephone = tempUserId;
+
     const otpData = otpStore[telephone];
     if (!otpData) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Aucun code OTP trouvé ou expiré." 
+        message: "Aucun code OTP trouvé ou expiré."
       });
     }
 
-    // Vérifie la validité et la correspondance du code
     if (otpData.otp !== otpCode) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Code OTP incorrect." 
+        message: "Code OTP incorrect."
       });
     }
     if (otpData.expiresAt < new Date()) {
       delete otpStore[telephone];
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Code OTP expiré." 
+        message: "Code OTP expiré."
       });
     }
 
-    // Hash du mot de passe avant création
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(otpData.password, salt);
 
-    // Création du compte utilisateur dans MongoDB
     const newUser = await User.create({
       telephone: otpData.telephone,
       firstName: otpData.firstName,
@@ -165,12 +194,11 @@ module.exports.VerifyCreateAccountOTP = async (req, res) => {
       role: "actionnaire",
     });
 
-    // Nettoyage : on supprime les données temporaires
     delete otpStore[telephone];
 
     return res.status(201).json({
-      success: true,  // ← AJOUTÉ
-      message: "Compte créé et vérifié avec succès 🎉",
+      success: true,
+      message: "Compte créé et vérifié avec succès",
       user: {
         id: newUser._id,
         firstName: newUser.firstName,
@@ -179,65 +207,63 @@ module.exports.VerifyCreateAccountOTP = async (req, res) => {
     });
   } catch (error) {
     console.error("Erreur VerifyOTP:", error);
-    res.status(500).json({ 
-      success: false,  // ← AJOUTÉ
-      message: "Erreur interne du serveur", 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      message: "Erreur interne du serveur",
+      error: error.message
     });
   }
 };
+FIN ANCIEN CODE OTP - VerifyCreateAccountOTP */
+/* ANCIEN CODE OTP - COMMENTÉ - resendSignUpOTP
 module.exports.resendSignUpOTP = async (req, res) => {
   try {
     const { tempUserId } = req.body;
-    
-    const telephone = tempUserId; // tempUserId contient le numéro de téléphone
 
-    // Vérifier si les données temporaires existent dans otpStore
+    const telephone = tempUserId;
+
     const otpData = otpStore[telephone];
     if (!otpData) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "Aucune session de création trouvée ou expirée" 
+        message: "Aucune session de création trouvée ou expirée"
       });
     }
 
-    // Vérifier si les données temporaires n'ont pas expiré
     if (otpData.expiresAt < new Date()) {
       delete otpStore[telephone];
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: "Session de création expirée" 
+        message: "Session de création expirée"
       });
     }
 
-    // Générer un nouveau code OTP
     const newOtpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // Mettre à jour l'OTP existant en gardant les autres données
+
     otpStore[telephone] = {
-      ...otpData, // Garde toutes les données existantes (firstName, lastName, password, etc.)
-      otp: newOtpCode, // Met à jour le code OTP
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000) // Nouvelle expiration de 5 minutes
+      ...otpData,
+      otp: newOtpCode,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000)
     };
 
-    // Envoyer le nouveau code OTP via WhatsApp
     await sendWhatsAppMessage(telephone, newOtpCode);
 
-    return res.status(200).json({ 
+    return res.status(200).json({
       success: true,
-      message: "Nouveau code de vérification envoyé", 
-      expiresIn: 5 * 60 // en secondes
+      message: "Nouveau code de vérification envoyé",
+      expiresIn: 5 * 60
     });
-    
+
   } catch (error) {
     console.error('Erreur lors du renvoi OTP:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Erreur interne du serveur", 
-      error: error.message 
+      message: "Erreur interne du serveur",
+      error: error.message
     });
   }
 };
+FIN ANCIEN CODE OTP - resendSignUpOTP */
 module.exports.getMyProfile = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -333,6 +359,7 @@ module.exports.checkAndGetUserByToken = async (req, res) => {
         return res.status(500).json({ message: 'server.error', error: error.message });
     }
 };
+/* ANCIEN CODE OTP - COMMENTÉ - verifyOTPAndSignIn
 module.exports.verifyOTPAndSignIn = async (req, res) => {
   try {
      const { userId, otpCode } = req.body;
@@ -356,75 +383,73 @@ module.exports.verifyOTPAndSignIn = async (req, res) => {
       sameSite: "strict",
       maxAge: 24 * 60 * 60 * 1000,
     });
-    res.status(200).json({ 
-      message: "Connexion réussie", 
-      token, 
-      user 
+    res.status(200).json({
+      message: "Connexion réussie",
+      token,
+      user
     });
   } catch (error) {
     console.error("Erreur lors de la vérification OTP:", error);
     res.status(500).json({ message: "Erreur interne du serveur" });
   }
 };
+FIN ANCIEN CODE OTP - verifyOTPAndSignIn */
+
+/* ANCIEN CODE OTP - COMMENTÉ - resendLoginOTP
 module.exports.resendLoginOTP = async (req, res) => {
   try {
     const { userId } = req.body;
 
-    // Vérifier si les données OTP existent pour cet utilisateur
     if (!otpStore[userId]) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "Session de connexion expirée. Veuillez recommencer." 
+        message: "Session de connexion expirée. Veuillez recommencer."
       });
     }
 
-    // Vérifier si la session n'a pas déjà expiré
     if (new Date() > otpStore[userId].expiresAt) {
       delete otpStore[userId];
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: "Session de connexion expirée. Veuillez recommencer." 
+        message: "Session de connexion expirée. Veuillez recommencer."
       });
     }
 
-    // Récupérer le numéro de téléphone de l'utilisateur
     const user = await User.findById(userId).select("telephone");
     if (!user) {
       delete otpStore[userId];
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "Utilisateur non trouvé" 
+        message: "Utilisateur non trouvé"
       });
     }
 
-    // Générer un nouveau code OTP
     const newOtpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Mettre à jour l'OTP en gardant le userId
     otpStore[userId] = {
       code: newOtpCode,
-      expiresAt: new Date(Date.now() + 2 * 60 * 1000), // 2 minutes
+      expiresAt: new Date(Date.now() + 2 * 60 * 1000),
       type: 'login'
     };
 
-    // Envoyer le nouveau code OTP via WhatsApp
     await sendWhatsAppMessage(user.telephone, newOtpCode);
 
-    return res.status(200).json({ 
+    return res.status(200).json({
       success: true,
-      message: "Nouveau code de vérification envoyé", 
-      expiresIn: 2 * 60 // en secondes
+      message: "Nouveau code de vérification envoyé",
+      expiresIn: 2 * 60
     });
 
   } catch (error) {
     console.error('Erreur lors du renvoi OTP de connexion:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Erreur interne du serveur", 
-      error: error.message 
+      message: "Erreur interne du serveur",
+      error: error.message
     });
   }
 };
+FIN ANCIEN CODE OTP - resendLoginOTP */
 module.exports.createAdmin = async (req, res) => {
   try {
     const { telephone, firstName, lastName, password, role } = req.body;
@@ -626,170 +651,86 @@ module.exports.getUserBalance = async (req, res) => {
     });
   }
 };
+// Réinitialisation de mot de passe SANS OTP - Étape 1: Vérifier le téléphone
 module.exports.sendPasswordResetOTP = async (req, res) => {
   try {
     const { telephone } = req.body;
 
-    // Validation du numéro de téléphone
     if (!telephone) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Le numéro de téléphone est requis.' 
+        message: 'Le numéro de téléphone est requis.'
       });
     }
 
-    // Vérifier si l'utilisateur existe
     const user = await User.findOne({ telephone });
 
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Aucun utilisateur trouvé avec ce numéro de téléphone.' 
+        message: 'Aucun utilisateur trouvé avec ce numéro de téléphone.'
       });
     }
 
-    // Vérifier si l'utilisateur n'est pas bloqué
     if (user.isBlocked) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         success: false,
-        message: 'Votre compte est bloqué. Contactez l\'administrateur.' 
+        message: 'Votre compte est bloqué. Contactez l\'administrateur.'
       });
     }
 
-    // Générer un code OTP pour la réinitialisation
-    const resetOTP = generateOTP();
-
-    // Stocker l'OTP avec un délai d'expiration (10 minutes)
-    passwordResetOtpStore[user._id] = {
-      code: resetOTP,
-      telephone: telephone,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
-      attempts: 0 // Compteur de tentatives
-    };
-
-    // Message WhatsApp pour la réinitialisation
-    const message = `Réinitialisation de mot de passe - Universall Fab
-Bonjour ${user.firstName} ${user.lastName},
-Votre code de réinitialisation de mot de passe est : ${resetOTP}
- Ce code expire dans 10 minutes.
- Pour votre sécurité, ne partagez ce code avec personne.
-Si vous n'avez pas demandé cette réinitialisation, ignorez ce message.
-Équipe Universall Fab`;
-
-    // Envoyer l'OTP par WhatsApp
-    try {
-      await sendWhatsAppMessage(telephone, message);
-      
-      //(`OTP de réinitialisation envoyé à ${telephone} pour l'utilisateur ${user._id}`);
-      
-      return res.status(200).json({ 
-        success: true,
-        message: 'Un code de réinitialisation a été envoyé à votre numéro WhatsApp.',
-        userId: user._id,
-        expiresIn: '10 minutes'
-      });
-      
-    } catch (msgError) {
-      console.error("Erreur lors de l'envoi du message WhatsApp:", msgError);
-      
-      // Nettoyer le store en cas d'échec d'envoi
-      delete passwordResetOtpStore[user._id];
-      
-      return res.status(500).json({ 
-        success: false,
-        message: 'Échec de l\'envoi du code de réinitialisation. Veuillez réessayer.' 
-      });
-    }
+    // Retourner directement le userId pour permettre la réinitialisation sans OTP
+    return res.status(200).json({
+      success: true,
+      message: 'Utilisateur trouvé. Vous pouvez réinitialiser votre mot de passe.',
+      userId: user._id,
+      canResetPassword: true
+    });
 
   } catch (error) {
     console.error("Erreur lors de la demande de réinitialisation :", error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
-      message: 'Une erreur est survenue. Veuillez réessayer.' 
+      message: 'Une erreur est survenue. Veuillez réessayer.'
     });
   }
 };
+
+// Réinitialisation de mot de passe SANS OTP - Étape 2: Changer le mot de passe
 module.exports.verifyOTPAndResetPassword = async (req, res) => {
   try {
-    const { userId, otpCode, newPassword } = req.body;
+    const { userId, newPassword } = req.body;
 
-    // Validation des données
-    if (!userId || !otpCode || !newPassword) {
-      return res.status(400).json({ 
+    // Validation des données (otpCode n'est plus requis)
+    if (!userId || !newPassword) {
+      return res.status(400).json({
         success: false,
-        message: 'Tous les champs sont requis (userId, otpCode, newPassword).' 
+        message: 'Tous les champs sont requis (userId, newPassword).'
       });
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Le nouveau mot de passe doit contenir au moins 6 caractères.' 
-      });
-    }
-
-    // Vérifier si l'OTP existe pour cet utilisateur
-    if (!passwordResetOtpStore[userId]) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Code de vérification invalide ou expiré.' 
-      });
-    }
-
-    const otpData = passwordResetOtpStore[userId];
-
-    // Vérifier si l'OTP n'a pas expiré
-    if (new Date() > otpData.expiresAt) {
-      delete passwordResetOtpStore[userId];
-      return res.status(401).json({ 
-        success: false,
-        message: 'Code de vérification expiré. Veuillez demander un nouveau code.' 
-      });
-    }
-
-    // Limiter le nombre de tentatives (max 3)
-    if (otpData.attempts >= 3) {
-      delete passwordResetOtpStore[userId];
-      return res.status(429).json({ 
-        success: false,
-        message: 'Trop de tentatives. Veuillez demander un nouveau code.' 
-      });
-    }
-
-    // Vérifier si le code OTP est correct
-    if (otpData.code !== otpCode) {
-      otpData.attempts += 1;
-      return res.status(401).json({ 
-        success: false,
-        message: `Code de vérification incorrect. Tentatives restantes: ${3 - otpData.attempts}` 
+        message: 'Le nouveau mot de passe doit contenir au moins 6 caractères.'
       });
     }
 
     // Rechercher l'utilisateur dans la base de données
     const user = await User.findById(userId);
     if (!user) {
-      delete passwordResetOtpStore[userId];
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Utilisateur introuvable.' 
-      });
-    }
-
-    // Vérifier que le téléphone correspond (sécurité supplémentaire)
-    if (user.telephone !== otpData.telephone) {
-      delete passwordResetOtpStore[userId];
-      return res.status(400).json({ 
-        success: false,
-        message: 'Données de sécurité incorrectes.' 
+        message: 'Utilisateur introuvable.'
       });
     }
 
     // Vérifier que le nouveau mot de passe est différent de l'ancien
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
     if (isSamePassword) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Le nouveau mot de passe doit être différent de l\'ancien.' 
+        message: 'Le nouveau mot de passe doit être différent de l\'ancien.'
       });
     }
 
@@ -801,119 +742,91 @@ module.exports.verifyOTPAndResetPassword = async (req, res) => {
     user.password = hashedPassword;
     await user.save();
 
-    // Nettoyer le store après succès
-    delete passwordResetOtpStore[userId];
-
-    // Message de confirmation par WhatsApp
-/*     const confirmationMessage = `✅Mot de passe réinitialisé - Dioko
-
-Bonjour ${user.firstName} ${user.lastName},
-
-Votre mot de passe a été réinitialisé avec succès.
-
-Heure : ${new Date().toLocaleString('fr-FR', { timeZone: 'Africa/Dakar' })}
-
-Si vous n'êtes pas à l'origine de cette action, contactez immédiatement l'administrateur.
-
-Équipe Dioko`;
-
-    // Envoyer la confirmation (optionnel, ne pas bloquer en cas d'erreur)
-    try {
-      await sendWhatsAppMessage(user.telephone, confirmationMessage);
-    } catch (confirmError) {
-      console.error("Erreur envoi confirmation:", confirmError);
-      // On continue même si l'envoi de confirmation échoue
-    } */
-
-    return res.status(200).json({ 
+    return res.status(200).json({
       success: true,
-      message: 'Mot de passe réinitialisé avec succès.' 
+      message: 'Mot de passe réinitialisé avec succès.'
     });
 
   } catch (error) {
     console.error('Erreur lors de la réinitialisation du mot de passe :', error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
-      message: 'Une erreur est survenue lors de la réinitialisation.' 
+      message: 'Une erreur est survenue lors de la réinitialisation.'
     });
   }
 };
 
+/* ANCIEN CODE OTP - COMMENTÉ - resendPasswordResetOTP
 module.exports.resendPasswordResetOTP = async (req, res) => {
   try {
     const { userId } = req.body;
 
     if (!userId) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'ID utilisateur requis.' 
+        message: 'ID utilisateur requis.'
       });
     }
 
-    // Vérifier si l'utilisateur existe
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Utilisateur non trouvé.' 
+        message: 'Utilisateur non trouvé.'
       });
     }
 
-    // Vérifier si l'utilisateur n'est pas bloqué
     if (user.isBlocked) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         success: false,
-        message: 'Votre compte est bloqué.' 
+        message: 'Votre compte est bloqué.'
       });
     }
 
-    // Générer un nouveau code OTP
     const resetOTP = generateOTP();
 
-    // Stocker le nouveau OTP
     passwordResetOtpStore[user._id] = {
       code: resetOTP,
       telephone: user.telephone,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
       attempts: 0
     };
 
-    // Message WhatsApp
     const message = ` Nouveau code de réinitialisation - Universall Fab
 Votre nouveau code de réinitialisation est : ${resetOTP}
 Ce code expire dans 10 minutes.
 Équipe Universall Fab`;
 
-    // Envoyer le nouveau OTP
     try {
       await sendWhatsAppMessage(user.telephone, message);
-      
-      return res.status(200).json({ 
+
+      return res.status(200).json({
         success: true,
         message: 'Un nouveau code de réinitialisation a été envoyé.',
         userId: user._id
       });
-      
+
     } catch (msgError) {
       console.error("Erreur lors de l'envoi du nouveau code:", msgError);
       delete passwordResetOtpStore[user._id];
-      
-      return res.status(500).json({ 
+
+      return res.status(500).json({
         success: false,
-        message: 'Échec de l\'envoi du nouveau code.' 
+        message: 'Échec de l\'envoi du nouveau code.'
       });
     }
 
   } catch (error) {
     console.error("Erreur lors du renvoi de l'OTP:", error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
-      message: 'Erreur interne du serveur.' 
+      message: 'Erreur interne du serveur.'
     });
   }
 };
+FIN ANCIEN CODE OTP - resendPasswordResetOTP */
 
-// Fonction utilitaire pour nettoyer les OTPs expirés (à appeler périodiquement)
+/* ANCIEN CODE OTP - COMMENTÉ - cleanExpiredPasswordResetOTPs
 module.exports.cleanExpiredPasswordResetOTPs = () => {
   const now = new Date();
   for (const userId in passwordResetOtpStore) {
@@ -923,10 +836,10 @@ module.exports.cleanExpiredPasswordResetOTPs = () => {
   }
 };
 
-// Nettoyer les OTPs expirés toutes les 15 minutes
 setInterval(() => {
   module.exports.cleanExpiredPasswordResetOTPs();
 }, 15 * 60 * 1000);
+FIN ANCIEN CODE OTP - cleanExpiredPasswordResetOTPs */
 
 module.exports.resetPassWord = async (req, res) => {
   try {
