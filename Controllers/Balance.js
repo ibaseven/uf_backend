@@ -775,4 +775,379 @@ if (reste > 0) {
       error: error.message
     });
   }
-};  
+};
+
+// ==========================================
+// FONCTIONS POUR LES ACTIONNAIRES
+// ==========================================
+
+// Initier un retrait de dividendes pour un actionnaire
+exports.initiateActionnaireWithdrawal = async (req, res) => {
+  try {
+    const { phoneNumber, amount, paymentMethod } = req.body;
+    const userId = req.user.id;
+
+    // Validation des paramètres
+    if (!phoneNumber || !amount || !paymentMethod) {
+      return res.status(400).json({
+        success: false,
+        message: 'Paramètres manquants (phoneNumber, amount, paymentMethod)'
+      });
+    }
+
+    const parsedAmount = Number.parseFloat(amount);
+
+    if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Montant invalide'
+      });
+    }
+
+    if (parsedAmount < MIN_WITHDRAWAL) {
+      return res.status(400).json({
+        success: false,
+        message: `Montant minimum: ${MIN_WITHDRAWAL} FCFA`
+      });
+    }
+
+    if (parsedAmount > MAX_WITHDRAWAL) {
+      return res.status(400).json({
+        success: false,
+        message: `Montant maximum: ${MAX_WITHDRAWAL.toLocaleString()} FCFA`
+      });
+    }
+
+    // Récupérer l'actionnaire
+    const actionnaire = await User.findById(userId);
+    if (!actionnaire) {
+      return res.status(404).json({
+        success: false,
+        message: 'Utilisateur non trouvé'
+      });
+    }
+
+    // Récupérer l'owner pour vérifier son solde dividende_actions
+    const owner = await User.findOne({ isTheOwner: true });
+    if (!owner) {
+      return res.status(404).json({
+        success: false,
+        message: 'Owner non trouvé'
+      });
+    }
+
+    // 1. Vérifier d'abord le solde dividende_actions de l'owner (admin)
+    const ownerDividendeActions = Number.parseFloat(owner.dividende_actions);
+    if (ownerDividendeActions < parsedAmount) {
+      return res.status(400).json({
+        success: false,
+        message: `Solde entreprise insuffisant.`,
+        data: {
+          available: ownerDividendeActions,
+          requested: parsedAmount,
+          shortage: parsedAmount - ownerDividendeActions
+        }
+      });
+    }
+
+    // 2. Ensuite vérifier le solde dividende de l'actionnaire
+    const actionnaireBalance = Number.parseFloat(actionnaire.dividende) || 0;
+    if (actionnaireBalance < parsedAmount) {
+      return res.status(400).json({
+        success: false,
+        message: `Votre solde est insuffisant. Disponible: ${actionnaireBalance.toLocaleString()} FCFA`,
+        data: {
+          available: actionnaireBalance,
+          requested: parsedAmount,
+          shortage: parsedAmount - actionnaireBalance
+        }
+      });
+    }
+
+    // Appel PayDunya
+    let transferResult;
+    try {
+      transferResult = await transferToAgent({
+        account_alias: phoneNumber,
+        amount: parsedAmount,
+        withdraw_mode: paymentMethod,
+        callback_url: 'https://www.diokogroup.com'
+      });
+    } catch (error) {
+      console.error("Erreur PayDunya :", error);
+      return res.status(400).json({
+        success: false,
+        message: 'Erreur lors de la création du retrait'
+      });
+    }
+
+    // Vérifier succès PayDunya
+    if (!transferResult || transferResult.response_code !== "00") {
+      return res.status(400).json({
+        success: false,
+        message: transferResult?.message || 'Erreur PayDunya'
+      });
+    }
+
+    const disburseInvoice = transferResult.disburse_token;
+    if (!disburseInvoice) {
+      return res.status(400).json({
+        success: false,
+        message: 'Réponse PayDunya incomplète'
+      });
+    }
+
+    // Génération OTP
+    const reference = generateReference(userId);
+    const otp = generateOTP();
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
+
+    // Stocker OTP avec type 'actionnaire' et les IDs nécessaires
+    otpStore.set(userId.toString(), {
+      code: otp,
+      expiresAt,
+      reference,
+      amount: parsedAmount,
+      phoneNumber,
+      paymentMethod,
+      disburseInvoice,
+      type: 'actionnaire',
+      ownerId: owner._id
+    });
+
+    // Envoi OTP via WhatsApp
+    if (actionnaire.telephone) {
+      const message = `Code UniversallFab: ${otp}\nRetrait de ${parsedAmount.toLocaleString()} FCFA vers ${phoneNumber}\nValide 5 minutes.`;
+      try {
+        await sendWhatsAppMessage(actionnaire.telephone, message);
+      } catch (error) {
+        console.warn("Échec envoi OTP :", error.message);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: 'Code de confirmation envoyé par WhatsApp',
+      data: {
+        reference,
+        amount: parsedAmount,
+        phoneNumber,
+        paymentMethod,
+        expiresIn: '5 minutes',
+        currentBalance: actionnaireBalance,
+        remainingAfter: actionnaireBalance - parsedAmount
+      }
+    });
+
+  } catch (error) {
+    console.error("Erreur initiateActionnaireWithdrawal :", error);
+    return res.status(500).json({
+      success: false,
+      message: 'Erreur serveur'
+    });
+  }
+};
+
+// Confirmer un retrait de dividendes pour un actionnaire
+exports.confirmActionnaireWithdrawal = async (req, res) => {
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    const { otpCode } = req.body;
+    const userId = req.user.id;
+
+    const actionnaire = await User.findById(userId).session(session);
+    if (!actionnaire) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Utilisateur non trouvé'
+      });
+    }
+
+    // Récupérer l'owner et le superAdmin
+    const owner = await User.findOne({ isTheOwner: true }).session(session);
+    const superAdmin = await User.findOne({ isTheSuperAdmin: true }).session(session);
+
+    if (!owner) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Owner non trouvé'
+      });
+    }
+
+    // Vérifier les données stockées
+    const otpData = otpStore.get(userId.toString());
+
+    if (!otpData) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Aucune demande de retrait trouvée ou expirée'
+      });
+    }
+
+    // Validation du code OTP
+    if (!otpCode) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Code OTP requis'
+      });
+    }
+
+    if (otpData.code !== otpCode) {
+      await session.abortTransaction();
+      return res.status(401).json({
+        success: false,
+        message: 'Code OTP incorrect'
+      });
+    }
+
+    if (new Date() > otpData.expiresAt) {
+      otpStore.delete(userId.toString());
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Code OTP expiré'
+      });
+    }
+
+    const amountCents = Math.round(otpData.amount * 100);
+
+    // 1. Vérifier le solde dividende_actions de l'owner
+    const ownerDividendeCents = Math.round((owner.dividende_actions || 0) * 100);
+    if (ownerDividendeCents < amountCents) {
+      otpStore.delete(userId.toString());
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Solde entreprise insuffisant: ${ownerDividendeCents / 100} FCFA`
+      });
+    }
+
+    // 2. Vérifier le solde dividende de l'actionnaire
+    const currentDividendCents = Math.round((actionnaire.dividende || 0) * 100);
+    if (currentDividendCents < amountCents) {
+      otpStore.delete(userId.toString());
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Votre solde insuffisant: ${currentDividendCents / 100} FCFA`
+      });
+    }
+
+    // Soumettre à PayDunya
+    const disbursementResult = await submitDisburseInvoice(otpData.disburseInvoice);
+
+    // Vérifier le résultat
+    const isSuccess = disbursementResult.success &&
+      disbursementResult.data?.response_code === '00';
+
+    if (!isSuccess) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: disbursementResult.message || 'Transaction échouée'
+      });
+    }
+
+    // Déterminer le statut
+    const paydounyaStatus = disbursementResult.data?.status;
+    let transactionStatus = 'confirmed';
+
+    if (paydounyaStatus === 'pending' || paydounyaStatus === 'processing') {
+      transactionStatus = 'pending';
+    }
+
+    // Créer la transaction
+    const transaction = new Transaction({
+      type: 'actionnaire_dividend_withdrawal',
+      amount: otpData.amount,
+      userId: userId,
+      recipientPhone: otpData.phoneNumber,
+      paymentMethod: otpData.paymentMethod,
+      status: transactionStatus,
+      description: `Retrait dividendes actionnaire ${otpData.amount.toLocaleString()} FCFA`,
+      reference: otpData.reference,
+      id_transaction: generateTransactionId(),
+      invoiceToken: otpData.disburseInvoice,
+      paydounyaReferenceId: disbursementResult.data?.transaction_id,
+      token: crypto.randomBytes(16).toString('hex')
+    });
+
+    await transaction.save({ session });
+
+    // Mettre à jour les dividendes de l'actionnaire
+    const newDividendCents = currentDividendCents - amountCents;
+    actionnaire.dividende = newDividendCents / 100;
+    await actionnaire.save({ session });
+
+    // Mettre à jour le dividende_actions de l'owner
+    const newOwnerDividendeCents = ownerDividendeCents - amountCents;
+    owner.dividende_actions = newOwnerDividendeCents / 100;
+    await owner.save({ session });
+
+    // Mettre à jour le superAdmin si existant
+    if (superAdmin) {
+      const superAdminDividendeCents = Math.round((superAdmin.dividende_actions || 0) * 100);
+      superAdmin.dividende_actions = (superAdminDividendeCents - amountCents) / 100;
+      await superAdmin.save({ session });
+    }
+
+    // Supprimer l'OTP
+    otpStore.delete(userId.toString());
+
+    // Commit
+    await session.commitTransaction();
+
+    // Notification WhatsApp
+    if (actionnaire.telephone) {
+      const message = transactionStatus === 'confirmed'
+        ? `Retrait confirmé !\nMontant: ${otpData.amount.toLocaleString()} FCFA\nVers: ${otpData.phoneNumber}\nRéférence: ${otpData.reference}\nNouveau solde: ${(newDividendCents / 100).toLocaleString()} FCFA`
+        : `Retrait en cours de traitement\nMontant: ${otpData.amount.toLocaleString()} FCFA\nVers: ${otpData.phoneNumber}\nRéférence: ${otpData.reference}`;
+
+      try {
+        await sendWhatsAppMessage(actionnaire.telephone, message);
+      } catch (error) {
+        console.warn('Erreur notification:', error.message);
+      }
+    }
+
+    // Réponse
+    return res.json({
+      success: true,
+      message: transactionStatus === 'confirmed'
+        ? 'Retrait effectué avec succès'
+        : 'Retrait en cours de traitement',
+      transaction: {
+        id: transaction._id,
+        reference: transaction.reference,
+        amount: otpData.amount,
+        status: transactionStatus
+      },
+      dividends: {
+        previous: currentDividendCents / 100,
+        withdrawn: otpData.amount,
+        remaining: newDividendCents / 100
+      }
+    });
+
+  } catch (error) {
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
+
+    console.error('Erreur confirmActionnaireWithdrawal:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Erreur serveur'
+    });
+
+  } finally {
+    session.endSession();
+  }
+};
