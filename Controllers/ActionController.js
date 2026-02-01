@@ -655,6 +655,141 @@ const totalPrice = pricePerAction * actionNumber;
 };
 
 
+module.exports.buyActionWithDividends = async (req, res) => {
+    const session = await mongoose.startSession();
+
+    try {
+        session.startTransaction();
+
+        const userId = req.user.id;
+        const { actionNumber } = req.body;
+
+     
+        if (!actionNumber || actionNumber < 5) {
+            await session.abortTransaction();
+            return res.status(400).json({
+                message: "Nombre d'actions invalide (minimum 5 actions)"
+            });
+        }
+
+        if (actionNumber % 5 !== 0) {
+            await session.abortTransaction();
+            return res.status(400).json({
+                message: "Le nombre d'actions doit être un multiple de 5 (5, 10, 15, 20...)"
+            });
+        }
+
+        // Récupérer l'utilisateur
+        const user = await User.findById(userId).session(session);
+        if (!user) {
+            await session.abortTransaction();
+            return res.status(404).json({ message: "Utilisateur non trouvé" });
+        }
+
+        // Récupérer le prix par action
+        const settings = await Settings.findOne().session(session);
+        if (!settings || !settings.pricePerAction) {
+            await session.abortTransaction();
+            return res.status(500).json({ message: "Prix par action non configuré" });
+        }
+
+        const pricePerAction = settings.pricePerAction;
+        const totalPrice = pricePerAction * actionNumber;
+
+        // Vérifier le solde de dividende
+        const userDividend = user.dividende || 0;
+        if (userDividend < totalPrice) {
+            await session.abortTransaction();
+            return res.status(400).json({
+                message: `Solde de dividende insuffisant. Disponible: ${userDividend.toLocaleString()} FCFA, Requis: ${totalPrice.toLocaleString()} FCFA`
+            });
+        }
+
+        // Déduire le montant du dividende
+        user.dividende = userDividend - totalPrice;
+
+        // Augmenter le nombre d'actions
+        const actionNumberInt = Number.parseInt(actionNumber) || 0;
+        user.actionsNumber = (Number.parseInt(user.actionsNumber) || 0) + actionNumberInt;
+
+        await user.save({ session });
+
+        // Créer l'action (déjà confirmée car payée par dividende)
+        const newAction = new Action({
+            userId,
+            actionNumber: actionNumberInt,
+            price: totalPrice,
+            invoiceToken: `DIV_${Date.now()}_${userId}`,
+            status: "confirmed",
+            paidWithDividend: true
+        });
+        await newAction.save({ session });
+
+        // Créer la transaction
+        const transaction = new Transactions({
+            actions: [newAction._id],
+            userId,
+            actionNumber: actionNumberInt,
+            description: `Achat de ${actionNumberInt} action${actionNumberInt > 1 ? 's' : ''} avec dividendes`,
+            amount: totalPrice,
+            invoiceToken: newAction.invoiceToken,
+            status: "confirmed",
+            paidWithDividend: true
+        });
+        await transaction.save({ session });
+
+        await session.commitTransaction();
+
+        // Génération et envoi du contrat PDF (hors transaction)
+        try {
+            console.log('📄 Génération du contrat PDF (achat avec dividendes)...');
+            const pdfBuffer = await generateContractPDF(newAction, user);
+            const fileName = `ContratActions_DIV_${newAction._id}_${Date.now()}.pdf`;
+            const pdfUrl = await uploadPDFToS3(pdfBuffer, fileName);
+
+            await sendWhatsAppDocument(
+                user.telephone,
+                pdfUrl.cleanUrl,
+                `🎉 Félicitations ${user.firstName} !
+Votre contrat d'achat d'actions est prêt.
+📄 Nombre d'actions : ${actionNumberInt}
+💰 Montant payé : ${totalPrice.toLocaleString()} FCFA (via dividendes)
+Merci pour votre confiance 🙏`
+            );
+
+            console.log('✅ Contrat PDF envoyé par WhatsApp');
+
+        } catch (pdfError) {
+            console.error('❌ Erreur envoi contrat PDF:', pdfError.message);
+        }
+
+        return res.status(201).json({
+            message: "Achat d'actions avec dividendes effectué avec succès !",
+            data: {
+                action: newAction,
+                transaction,
+                newDividendBalance: user.dividende,
+                newActionsNumber: user.actionsNumber,
+                totalPaid: totalPrice
+            }
+        });
+
+    } catch (error) {
+        if (session.inTransaction()) {
+            await session.abortTransaction();
+        }
+
+        console.error("❌ Erreur buyActionWithDividends:", error.message);
+        return res.status(500).json({
+            message: "Erreur serveur",
+            details: error.message
+        });
+
+    } finally {
+        session.endSession();
+    }
+};
+
 module.exports.updateStatusBuyAction = async (invoiceToken, status) => {
     const session = await mongoose.startSession();
     
