@@ -493,8 +493,9 @@ module.exports.createAdmin = async (req, res) => {
 module.exports.getAllActionnaire = async (req, res) => {
   try {
     const actionnaires = await User.find({ role: "actionnaire" })
-      .populate('parrain', 'firstName lastName telephone') 
-      .select('-password'); 
+      .populate('parrain', 'firstName lastName telephone')
+      .populate('assignedProjects', 'nameProject isVisible')
+      .select('-password');
 
     return res.status(200).json({
       success: true,

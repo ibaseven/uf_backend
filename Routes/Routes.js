@@ -3,7 +3,7 @@ const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, create
 // ANCIEN CODE OTP - imports commentés: verifyOTPAndSignIn, VerifyCreateAccountOTP, resendPasswordResetOTP, resendSignUpOTP, resendLoginOTP
 const { participateProject, giveYourDividendToTheProject, getProjectByUser } = require("../Controllers/UserProjectController");
 const { authenticateTokenAndUserData, authenticateUser, adminRole, authenticateAdmin } = require("../Middlewares/VerifyToken");
-const { createProject, getAllProject, getProjectParticipants, decreaseParticipantPacks, increaseParticipantPacks, updateProject, deleteProject } = require("../Controllers/ProjectController");
+const { createProject, getAllProject, getProjectParticipants, decreaseParticipantPacks, increaseParticipantPacks, updateProject, deleteProject, assignUserToProject, unassignUserFromProject, getProjectsForUser } = require("../Controllers/ProjectController");
 const { handlePaymentCallback, handleBuyActionsCallback, confirmPaymentManually } = require("../Controllers/paymentCallbackController");
 const { buyAction } = require("../Controllers/ActionController");
 const { bulkCreateUsersFromPDF, uploadPDF } = require("../utils/bulkCreateUsers");
@@ -12,7 +12,7 @@ const { uploadImg } = require("../Middlewares/awsUpload");
 const { previewPdfImport } = require("../utils/test");
 const { updateActionPrice, getActionPrice } = require("../Controllers/SettingsController");
 const { payduniaCallbackLimiter, verifyPaydunyaCallback, paydunyaCallbackLimiter } = require("../Middlewares/payduniaCallbackMiddleware");
-const { initiateDividendWithdrawal, confirmDividendWithdrawal, initiateDividendActionsWithdrawal, initiateDividendProjectWithdrawal, confirmDividendProjectWithdrawal, confirmDividendActionsWithdrawal } = require("../Controllers/Balance");
+const { initiateDividendWithdrawal, confirmDividendWithdrawal, initiateDividendActionsWithdrawal, initiateDividendProjectWithdrawal, confirmDividendProjectWithdrawal, confirmDividendActionsWithdrawal, initiateActionnaireWithdrawal, confirmActionnaireWithdrawal } = require("../Controllers/Balance");
 const { deducteTheFee } = require("../Controllers/feesController");
 const { createActionAndCalculateDividendes, distributeProjectDividende } = require("../Controllers/ActionandProjectController");
 const { createBulkUsersWithRandomPasswords, createSingleUserWithRandomPassword } = require("../Controllers/BulkUserCreationController");
@@ -71,9 +71,13 @@ router.post("/dividends/withdrawProjects/confirm",adminRole, confirmDividendProj
 router.post("/dividends/withdrawActions/confirm",adminRole, confirmDividendActionsWithdrawal);
 router.post("/deduceFees",authenticateUser,deducteTheFee);
 router.get("/getTransactionsByProcess",getTransactionsByProcess)
+// Route pour les projets visibles (doit être avant les routes avec :projectId)
+router.get('/projects/visible', authenticateUser, getProjectsForUser);
 router.get('/projects/:projectId/participants', authenticateUser,getProjectParticipants);
 router.put('/projects/:projectId/participants/:userId/decrease',authenticateUser,decreaseParticipantPacks);
 router.put('/projects/:projectId/participants/:userId/increase',authenticateUser,increaseParticipantPacks);
+router.post('/projects/:projectId/assign/:userId', authenticateUser, adminRole, assignUserToProject);
+router.delete('/projects/:projectId/assign/:userId', authenticateUser, adminRole, unassignUserFromProject);
 router.put("/updateProject/:id",authenticateUser, adminRole,updateProject)
 router.delete("/deleteProject/:id",authenticateUser, adminRole,deleteProject)
 router.delete("/deteleUser/:id",authenticateUser, adminRole,deleteUser)
@@ -88,4 +92,9 @@ router.post('/send-passwords-actionnaires', sendPasswordsToActionnaires);
 router.post('/send-whatsapp-invitations', adminRole, sendInvitations);
 router.post('/send-whatsapp-invitation/:userId', adminRole, sendInvitationToActionnaire);
 router.post("/confirm", confirmPaymentManually);
+
+// Routes pour le retrait de dividendes des actionnaires
+router.post("/actionnaire/withdraw/initiate", authenticateUser, initiateActionnaireWithdrawal);
+router.post("/actionnaire/withdraw/confirm", authenticateUser, confirmActionnaireWithdrawal);
+
 module.exports=router

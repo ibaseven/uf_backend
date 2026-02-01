@@ -20,9 +20,17 @@ const ProjectSchema = mongoose.Schema({
     type: String,
   },
   rapportUrl: {
-    type: String, 
+    type: String,
     default: null
   },
+  isVisible: {
+    type: Boolean,
+    default: true
+  },
+  assignedUsers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
   participants: [{
     userId: {
       type: mongoose.Schema.Types.ObjectId,
