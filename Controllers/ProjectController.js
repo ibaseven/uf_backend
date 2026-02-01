@@ -11,13 +11,13 @@ const generateDownloadUrl = (fileName) => {
 };
 module.exports.createProject=async(req,res)=>{
     try {
-        const{nameProject,packPrice,duration,monthlyPayment,description,gainProject}=req.body 
+        const{nameProject,packPrice,duration,monthlyPayment,description,gainProject,isVisible}=req.body
         let rapportFileName = null;
     let rapportUrl = null;
      if (req.uploadedFiles && req.uploadedFiles.length > 0) {
       rapportFileName = req.uploadedFiles[0];
       rapportUrl = generateDownloadUrl(rapportFileName);
-      
+
       //(`Fichier rapport uploadé: ${rapportFileName}`);
       //(`URL de téléchargement: ${rapportUrl}`);
     }
@@ -35,11 +35,12 @@ module.exports.createProject=async(req,res)=>{
             description,
             gainProject,
              rapport: rapportFileName,
-      rapportUrl: rapportUrl
+      rapportUrl: rapportUrl,
+      isVisible: isVisible !== undefined ? (isVisible === true || isVisible === 'true') : true
         }
         const newProject= await Project.create(projectData)
 
-        
+
         return res.status(200).json({success:true,message:"Create succesfuley",newProject})
     } catch (error) {
         res.status(500).send({success:false, message: "Internal Server Error", error });
@@ -49,16 +50,22 @@ module.exports.createProject=async(req,res)=>{
 module.exports.updateProject=async (req,res) => {
     try {
        const {id} = req.params
-      const{nameProject,packPrice,duration,monthlyPayment}=req.body 
+      const{nameProject,packPrice,duration,monthlyPayment,isVisible}=req.body
        const updateData = {
            nameProject,packPrice,duration,monthlyPayment
         };
+
+      // Ajouter isVisible seulement s'il est défini (gère aussi la conversion string -> boolean)
+      if (isVisible !== undefined) {
+        updateData.isVisible = isVisible === true || isVisible === 'true';
+      }
+
       const update= await Project.findByIdAndUpdate(
          id,
        updateData,
         { new: true }
       )
-        return res.status(200).json({message:"Update Succesful"},update)
+        return res.status(200).json({success: true, message:"Update Succesful", project: update})
     } catch (error) {
         res.status(500).send({ message: "Internal Server Error", error });
     }
@@ -322,6 +329,148 @@ module.exports.increaseParticipantPacks = async (req, res) => {
   } catch (error) {
     console.error("Erreur augmentation packs:", error);
     res.status(500).json({
+      success: false,
+      message: "Erreur serveur",
+      error: error.message
+    });
+  }
+};
+
+// Assigner un utilisateur à un projet (pour lui donner accès même si le projet n'est pas visible)
+module.exports.assignUserToProject = async (req, res) => {
+  try {
+    const { projectId, userId } = req.params;
+
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Projet introuvable"
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Utilisateur introuvable"
+      });
+    }
+
+    // Vérifier si l'utilisateur est déjà assigné au projet
+    if (project.assignedUsers && project.assignedUsers.includes(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "L'utilisateur est déjà assigné à ce projet"
+      });
+    }
+
+    // Ajouter l'utilisateur au projet
+    if (!project.assignedUsers) {
+      project.assignedUsers = [];
+    }
+    project.assignedUsers.push(userId);
+    await project.save();
+
+    // Ajouter le projet à l'utilisateur
+    if (!user.assignedProjects) {
+      user.assignedProjects = [];
+    }
+    if (!user.assignedProjects.includes(projectId)) {
+      user.assignedProjects.push(projectId);
+      await user.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Utilisateur assigné au projet avec succès",
+      project: project
+    });
+
+  } catch (error) {
+    console.error("Erreur assignation utilisateur:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur serveur",
+      error: error.message
+    });
+  }
+};
+
+// Désassigner un utilisateur d'un projet
+module.exports.unassignUserFromProject = async (req, res) => {
+  try {
+    const { projectId, userId } = req.params;
+
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Projet introuvable"
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Utilisateur introuvable"
+      });
+    }
+
+    // Retirer l'utilisateur du projet
+    if (project.assignedUsers) {
+      project.assignedUsers = project.assignedUsers.filter(
+        id => id.toString() !== userId.toString()
+      );
+      await project.save();
+    }
+
+    // Retirer le projet de l'utilisateur
+    if (user.assignedProjects) {
+      user.assignedProjects = user.assignedProjects.filter(
+        id => id.toString() !== projectId.toString()
+      );
+      await user.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Utilisateur retiré du projet avec succès"
+    });
+
+  } catch (error) {
+    console.error("Erreur désassignation utilisateur:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur serveur",
+      error: error.message
+    });
+  }
+};
+
+// Récupérer les projets visibles pour un utilisateur (visibles + assignés)
+module.exports.getProjectsForUser = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Récupérer tous les projets visibles OU assignés à l'utilisateur
+    const projects = await Project.find({
+      $or: [
+        { isVisible: true },
+        { assignedUsers: userId }
+      ]
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Projets récupérés avec succès",
+      projects
+    });
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération des projets:", error);
+    return res.status(500).json({
       success: false,
       message: "Erreur serveur",
       error: error.message
