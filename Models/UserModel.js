@@ -99,7 +99,11 @@ isTheOwner:{
 whatsAppInvitationSent:{
   type: Boolean,
   default: false
-}
+},
+assignedProjects: [{
+  type: mongoose.Schema.Types.ObjectId,
+  ref: 'Project'
+}]
 })
 
 module.exports=mongoose.model("User",UserSchema)
