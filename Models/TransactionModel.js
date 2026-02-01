@@ -30,6 +30,10 @@ const TransactionSchema = mongoose.Schema({
     invoiceToken:{
         type:String
     },
+    paidWithDividend:{
+        type:Boolean,
+        default:false
+    },
     createdAt: {
       type: Date,
       default: Date.now,
