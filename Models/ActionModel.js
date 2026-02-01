@@ -19,8 +19,10 @@ const ActionSchema = mongoose.Schema({
     invoiceToken:{
         type:String
     },
-     
-
+    paidWithDividend:{
+        type:Boolean,
+        default:false
+    }
 })
 
 module.exports=mongoose.model("Action",ActionSchema)

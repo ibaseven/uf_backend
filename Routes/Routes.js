@@ -5,7 +5,7 @@ const { participateProject, giveYourDividendToTheProject, getProjectByUser } = r
 const { authenticateTokenAndUserData, authenticateUser, adminRole, authenticateAdmin } = require("../Middlewares/VerifyToken");
 const { createProject, getAllProject, getProjectParticipants, decreaseParticipantPacks, increaseParticipantPacks, updateProject, deleteProject, assignUserToProject, unassignUserFromProject, getProjectsForUser } = require("../Controllers/ProjectController");
 const { handlePaymentCallback, handleBuyActionsCallback, confirmPaymentManually } = require("../Controllers/paymentCallbackController");
-const { buyAction } = require("../Controllers/ActionController");
+const { buyAction, buyActionWithDividends } = require("../Controllers/ActionController");
 const { bulkCreateUsersFromPDF, uploadPDF } = require("../utils/bulkCreateUsers");
 const { getAllTransactionsByUser, getAllTransactions, getTransactionsByProcess } = require("../Controllers/TransactionController");
 const { uploadImg } = require("../Middlewares/awsUpload");
@@ -40,6 +40,7 @@ router.post('/participeToProject',authenticateUser,participateProject)
 router.post("/giveYourDividendToTheProject",authenticateUser,giveYourDividendToTheProject)
 router.get('/getMyProfile', authenticateUser, getMyProfile);
 router.post("/buyActions",authenticateUser,buyAction)
+router.post("/buyActionsWithDividends",authenticateUser,buyActionWithDividends)
 router.post("/bulk-create-users",uploadPDF, bulkCreateUsersFromPDF);
 //router.post("/ipn",payduniaCallbackLimiter,handlePaymentCallback)
 router.post("/ipn",paydunyaCallbackLimiter,verifyPaydunyaCallback,handlePaymentCallback)
