@@ -606,12 +606,18 @@ exports.confirmDividendActionsWithdrawal = async (req, res) => {
       });
     }
 
-    // Déterminer le statut
+    
     const paydounyaStatus = disbursementResult.data?.status;
     let transactionStatus = 'confirmed';
-    
+   
     if (paydounyaStatus === 'pending' || paydounyaStatus === 'processing') {
       transactionStatus = 'pending';
+    }else if(paydounyaStatus === "failed"){
+       await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: disbursementResult.message || 'Transaction échouée'
+      });
     }
 
     // Créer la transaction
@@ -689,8 +695,9 @@ exports.confirmDividendActionsWithdrawal = async (req, res) => {
     
   } finally {
     session.endSession();
-  }
-};module.exports.deducteTheFee = async (req, res) => {
+  }}
+  
+;module.exports.deducteTheFee = async (req, res) => {
   try {
     const userId = req.user.id;
     const { montant, description } = req.body;
