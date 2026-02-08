@@ -441,12 +441,19 @@ const superAdmin = await User.findOne({ isTheSuperAdmin: true });
     }
 
     // Déterminer le statut
-    const paydounyaStatus = disbursementResult.data?.status;
+  const paydounyaStatus = disbursementResult.data?.status;
     let transactionStatus = 'confirmed';
-    
+   
     if (paydounyaStatus === 'pending' || paydounyaStatus === 'processing') {
       transactionStatus = 'pending';
+    }else if(paydounyaStatus === "failed"){
+       await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: disbursementResult.message || 'Transaction échouée'
+      });
     }
+
 
     // Créer la transaction
     const transaction = new Transaction({
@@ -1063,12 +1070,19 @@ exports.confirmActionnaireWithdrawal = async (req, res) => {
     }
 
     // Déterminer le statut
-    const paydounyaStatus = disbursementResult.data?.status;
+   const paydounyaStatus = disbursementResult.data?.status;
     let transactionStatus = 'confirmed';
-
+   
     if (paydounyaStatus === 'pending' || paydounyaStatus === 'processing') {
       transactionStatus = 'pending';
+    }else if(paydounyaStatus === "failed"){
+       await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: disbursementResult.message || 'Transaction échouée'
+      });
     }
+
 
     // Créer la transaction
     const transaction = new Transaction({
