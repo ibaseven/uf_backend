@@ -714,6 +714,23 @@ module.exports.buyActionWithDividends = async (req, res) => {
 
         await user.save({ session });
 
+      
+        if (user.parrain && mongoose.Types.ObjectId.isValid(user.parrain)) {
+            const parrain = await User.findById(user.parrain).session(session);
+
+            if (parrain) {
+                const priceCents = Math.round(totalPrice * 100);
+                const bonusCents = Math.round(priceCents * 0.10);
+                const parrainDividendeCents = Math.round((parrain.dividende || 0) * 100);
+                const newParrainDividendeCents = parrainDividendeCents + bonusCents;
+
+                parrain.dividende = newParrainDividendeCents / 100;
+                await parrain.save({ session });
+
+                console.log(`💰 Bonus parrainage de ${bonusCents / 100} FCFA ajouté au parrain ${parrain.telephone}`);
+            }
+        }
+
         // Créer l'action (déjà confirmée car payée par dividende)
         const newAction = new Action({
             userId,
