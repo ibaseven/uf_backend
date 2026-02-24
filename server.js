@@ -19,6 +19,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'https://staging-client.actionuniversalfab.com',
   'https://actionuniversalfab.com',
+  "https://www.actionuniversalfab.com"
 ];
 
 app.use(cors({
