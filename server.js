@@ -32,7 +32,11 @@ app.use(cors({
 
 
 // 5️⃣ Body parser normal pour le reste du site
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  }
+}));
 app.use(express.urlencoded({ extended: true }));
 
 

@@ -387,8 +387,7 @@
 
 const User = require("../Models/UserModel");
 const Action = require("../Models/ActionModel");
-const { createInvoice } = require("../Services/paydunya");
-const callbackurl = process.env.BACKEND_URL;
+const { initializePayment, checkPaymentStatus } = require("../Services/diokolinkService");
 const Transactions = require("../Models/TransactionModel");
 const { generateContractPDF, uploadPDFToS3 } = require("../utils/generatedPdf");
 const { sendWhatsAppMessage, sendWhatsAppDocument } = require("../utils/Whatsapp");
@@ -606,25 +605,37 @@ const pricePerAction = settings.pricePerAction;
 
 const totalPrice = pricePerAction * actionNumber;
 
-    // 4️⃣ Création de la facture
-    const items = [
-      { name: `Achat de ${actionNumber} actions`, unit_price: totalPrice }
-    ];
+    // 4️⃣ Création du paiement DiokoLink
     const actionsdescrip = `Achat de ${actionNumber} action${actionNumber > 1 ? 's' : ''}`;
 
-    const invoice = await createInvoice({
-      items,
-      totalAmount: totalPrice,
-      callbackUrl: `${callbackurl}/api/ipnpayment`,
-    });
+    const customer = {
+      name: `${user.firstName} ${user.lastName}`,
+      email: user.email || `${user.telephone}@dioko.com`,
+      phone: user.telephone
+    };
+    const reference = `ACT-${userId}-${Date.now()}`;
+
+    const paymentResponse = await initializePayment(
+      totalPrice,
+      'link',
+      customer,
+      reference,
+      null,
+      { nombre_actions: actionNumber, user_id: userId.toString() }
+    );
+
+    if (!paymentResponse.success) {
+      throw new Error(paymentResponse.error || 'Erreur création paiement DiokoLink');
+    }
+
+    console.log(`🧾 DiokoLink payment créé - transaction_id: ${paymentResponse.transaction_id} | reference: ${reference}`);
 
     // 5️⃣ Création de l'action
     const newAction = new Action({
       userId,
       actionNumber,
       price: totalPrice,
-      invoiceToken: invoice.token,
-      callbackUrl: invoice.callbackUrl,
+      invoiceToken: paymentResponse.transaction_id,
       status: "pending",
     });
     await newAction.save();
@@ -636,8 +647,7 @@ const totalPrice = pricePerAction * actionNumber;
       actionNumber,
       description: actionsdescrip,
       amount: totalPrice,
-      invoiceToken: invoice.token,
-      callbackUrl: invoice.callbackUrl,
+      invoiceToken: paymentResponse.transaction_id,
       status: "pending",
     });
     await transaction.save();
@@ -645,7 +655,12 @@ const totalPrice = pricePerAction * actionNumber;
     return res.status(201).json({
       message: "Achat effectué avec succès !",
       data: newAction,
-      invoice,
+      invoice: {
+        token: paymentResponse.transaction_id,
+        response_text: paymentResponse.payment_url,
+        payment_url: paymentResponse.payment_url,
+        transaction_id: paymentResponse.transaction_id
+      },
       transaction,
     });
   } catch (error) {

@@ -84,76 +84,117 @@ module.exports.handleBuyActionsCallback = async (req, res) => {
 const CallbackLog = require('../Models/CallbackLog');
 const { updateStatusBuyAction } = require('./ActionController');
 const { updateStatusPayemt } = require('./UserProjectController');
-const { validateCallbackPayload } = require('../Middlewares/callbackValidator');
+const { checkPaymentStatus } = require('../Services/diokolinkService');
 
-// Callback pour paiement de projets
+// Mapper les statuts DiokoLink vers les statuts internes
+const mapDiokolinkStatus = (diokolinkStatus) => {
+    const statusMapping = {
+        'pending': 'pending',
+        'success': 'completed',
+        'completed': 'completed',
+        'failed': 'failed',
+        'expired': 'cancelled',
+        'cancelled': 'cancelled'
+    };
+    return statusMapping[diokolinkStatus] || 'pending';
+};
+
+// Extraire le token et le statut depuis le body DiokoLink
+// Structure: {"event":"transaction.success","timestamp":"...","data":{"transaction_id":"AA0...","payment_link_token":"pl_..."}}
+// Le token stocké en DB est le payment_link_token (pl_...), pas le transaction_id final
+const extractDiokolinkData = (body) => {
+    const data = body.data || body;
+    // Priorité: payment_link_token (pl_...) qui correspond à ce qu'on stocke en DB
+    const token = data.payment_link_token || data.payment_link_id
+        || body.payment_link_token
+        || data.transaction_id || data.reference
+        || body.transaction_id || body.reference;
+    const rawStatus = data.status || (body.event?.replace('transaction.', '')) || body.status;
+    return { token, rawStatus };
+};
+
+// Callback pour paiement de projets (DiokoLink)
 module.exports.handlePaymentCallback = async (req, res) => {
     try {
-        // Le payload a été vérifié par verifyPaydunyaCallback
-        const data = req.paydunya;
-        
-        if (!data || !data.invoiceToken) {
-            return res.status(400).json({ message: "Payload invalide" });
+        const body = req.body;
+        const { token: invoiceToken, rawStatus } = extractDiokolinkData(body);
+
+        if (!invoiceToken) {
+            console.error('❌ Token manquant dans le callback DiokoLink', JSON.stringify(body).substring(0, 200));
+            return res.status(400).json({ message: "Token manquant" });
         }
-        
-        const invoiceToken = data.invoiceToken;
-        const status = data.status;
-        
+
+        // Vérifier le statut réel via DiokoLink API
+        let status = 'pending';
+        try {
+            const paymentStatus = await checkPaymentStatus(invoiceToken);
+            if (paymentStatus.success) {
+                status = mapDiokolinkStatus(paymentStatus.transaction?.status || rawStatus);
+            } else {
+                status = mapDiokolinkStatus(rawStatus);
+            }
+        } catch (err) {
+            console.warn('⚠️ Impossible de vérifier via API DiokoLink, utilisation du status du callback:', rawStatus);
+            status = mapDiokolinkStatus(rawStatus);
+        }
+
         const result = await updateStatusPayemt(invoiceToken, status);
-        
+
         if (result.error) {
-            return res.status(result.statusCode).json({ 
-                message: result.message
-            });
+            return res.status(result.statusCode).json({ message: result.message });
         }
-        
-        return res.status(200).json({
-            message: result.message,
-            success: true
-        });
-        
+
+        return res.status(200).json({ message: result.message, success: true });
+
     } catch (err) {
-        console.error("❌ Erreur callback payment:", err.message);
+        console.error("❌ Erreur callback payment DiokoLink:", err.message);
         return res.status(500).json({ message: "Erreur serveur" });
     }
 };
 
-// Callback pour achat d'actions
+// Callback pour achat d'actions (DiokoLink)
 module.exports.handleBuyActionsCallback = async (req, res) => {
     try {
-        // ✅ Le payload a déjà été vérifié par verifyPaydunyaCallback
-        const data = req.paydunya;
-        
-        if (!data || !data.invoiceToken) {
-            console.error('❌ Payload manquant après middleware');
-            return res.status(400).json({ message: "Payload invalide" });
+        const body = req.body;
+        const { token: invoiceToken, rawStatus } = extractDiokolinkData(body);
+
+        if (!invoiceToken) {
+            console.error('❌ Token manquant dans le callback DiokoLink', JSON.stringify(body).substring(0, 200));
+            return res.status(400).json({ message: "Token manquant" });
         }
-        
-        const invoiceToken = data.invoiceToken;
-        const status = data.status;
-        
-        console.log(`🔄 Traitement callback: ${invoiceToken} - Status: ${status}`);
-        
-        // Appeler la fonction de mise à jour
+
+        console.log(`🔄 Callback DiokoLink reçu - Token: ${invoiceToken} - Status brut: ${rawStatus}`);
+
+        // Vérifier le statut réel via DiokoLink API
+        let status = 'pending';
+        try {
+            const paymentStatus = await checkPaymentStatus(invoiceToken);
+            if (paymentStatus.success) {
+                status = mapDiokolinkStatus(paymentStatus.transaction?.status || rawStatus);
+                console.log(`✅ Statut DiokoLink vérifié: ${paymentStatus.transaction?.status} → ${status}`);
+            } else {
+                status = mapDiokolinkStatus(rawStatus);
+            }
+        } catch (err) {
+            console.warn('⚠️ Vérification API DiokoLink impossible, utilisation du status callback:', rawStatus);
+            status = mapDiokolinkStatus(rawStatus);
+        }
+
+        console.log(`🎯 Traitement callback: ${invoiceToken} - Status: ${status}`);
+
         const result = await updateStatusBuyAction(invoiceToken, status);
-        
-        // Gérer les erreurs
+
         if (result.error) {
             console.log(`⚠️ ${result.message}`);
-            return res.status(result.statusCode).json({ 
-                message: result.message
-            });
+            return res.status(result.statusCode).json({ message: result.message });
         }
-        
-        console.log(`✅ Callback traité avec succès: ${invoiceToken}`);
-        
-        return res.status(200).json({
-            message: result.message,
-            success: true
-        });
-        
+
+        console.log(`✅ Callback DiokoLink traité avec succès: ${invoiceToken}`);
+
+        return res.status(200).json({ message: result.message, success: true });
+
     } catch (err) {
-        console.error("❌ Erreur callback:", err.message);
+        console.error("❌ Erreur callback DiokoLink:", err.message);
         return res.status(500).json({ message: "Erreur serveur" });
     }
 };
