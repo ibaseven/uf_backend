@@ -2,12 +2,33 @@ const mongoose = require('mongoose');
 const crypto = require('crypto');
 const User = require('../Models/UserModel');
 const Transaction = require('../Models/TransactionModel');
-const { transferToAgent, submitDisburseInvoice } = require('../Services/paydunya');
+const { initializePayout } = require('../Services/diokolinkService');
 const { sendWhatsAppMessage } = require('../utils/Whatsapp');
 
 
 
 const otpStore = new Map();
+
+// Mapping des codes collect (frontend) → codes payout DiokoLink
+const PAYOUT_METHOD_MAP = {
+  'wave_sn_paydunya':       'wave_sn_payout_paydunya',
+  'om_sn_paydunya':         'om_sn_payout_paydunya',
+  'free_money_sn_paydunya': 'free_sn_payout_paydunya',
+  'wave_ci_paydunya':       'wave_ci_payout_paydunya',
+  'om_ci_paydunya':         'om_ci_payout_paydunya',
+  'mtn_ci_paydunya':        'mtn_ci_payout_paydunya',
+  'moov_ci_paydunya':       'moov_ci_payout_paydunya',
+  'mtn_bj_paydunya':        'mtn_bj_payout_paydunya',
+  'moov_bj_paydunya':       'moov_bj_payout_paydunya',
+  't_money_tg_paydunya':    't_money_tg_payout_paydunya',
+  'moov_tg_paydunya':       'moov_tg_payout_paydunya',
+  'om_ml_paydunya':         'om_ml_payout_paydunya',
+  'moov_ml_paydunya':       'moov_ml_payout_paydunya',
+  'om_bf_paydunya':         'om_bf_payout_paydunya',
+  'moov_bf_paydunya':       'moov_bf_payout_paydunya',
+};
+
+const mapPaymentMethod = (method) => PAYOUT_METHOD_MAP[method] || method;
 
 
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
@@ -40,12 +61,17 @@ setInterval(() => {
 
 exports.initiateDividendActionsWithdrawal = async (req, res) => {
   try {
-    //console.log("🔵 [INITIATE WITHDRAWAL] Requête reçue :", req.body);
-
     const { phoneNumber, amount, paymentMethod } = req.body;
     const adminId = req.user.id;
 
-    //console.log("👤 Admin ID :", adminId);
+    // Le superAdmin ne peut pas faire de retrait
+    const requestingAdmin = await User.findById(adminId);
+    if (requestingAdmin?.isTheSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Le super administrateur ne peut pas effectuer de retrait'
+      });
+    }
 
     // Validation des paramètres
     if (!phoneNumber || !amount || !paymentMethod) {
@@ -84,13 +110,10 @@ exports.initiateDividendActionsWithdrawal = async (req, res) => {
     }
 
     const actionnaire = await User.findById(adminId);
-    //console.log("👤 Actionnaire trouvé :", actionnaire ? actionnaire._id : "Aucun");
 
     const availableDividend = parseFloat(actionnaire.dividende_actions) || 0;
-    //console.log(`💵 Dividende disponible : ${availableDividend}`);
 
     if (availableDividend < parsedAmount) {
-      //console.warn("❌ Solde insuffisant", { available: availableDividend, requested: parsedAmount });
       return res.status(400).json({
         success: false,
         message: `Solde insuffisant. Disponible: ${availableDividend.toLocaleString()} FCFA`,
@@ -102,79 +125,28 @@ exports.initiateDividendActionsWithdrawal = async (req, res) => {
       });
     }
 
-    //console.log("🟦 Envoi de la requête PayDunya...");
-
-    let transferResult;
-    try {
-      transferResult = await transferToAgent({
-        account_alias: phoneNumber,
-        amount: parsedAmount,
-        withdraw_mode: paymentMethod,
-        callback_url: 'https://www.diokogroup.com'
-      });
-      //console.log("🟩 Réponse PayDunya :", transferResult);
-    } catch (error) {
-      console.error("❌ Erreur PayDunya :", error);
-      return res.status(400).json({
-        success: false,
-        message: 'Erreur lors de la création du retrait'
-      });
-    }
-
-    // ✅ Vérifier succès PayDunya
-    if (!transferResult || transferResult.response_code !== "00") {
-      console.error("❌ PayDunya échec :", transferResult);
-      return res.status(400).json({
-        success: false,
-        message: transferResult?.message || 'Erreur PayDunya'
-      });
-    }
-
-    // disburse_token = preuve de retrait en cours
-    const disburseInvoice = transferResult.disburse_token;
-    if (!disburseInvoice) {
-      console.error("❌ disburse_token manquant :", transferResult);
-      return res.status(400).json({
-        success: false,
-        message: 'Réponse PayDunya incomplète'
-      });
-    }
-    //console.log("📄 disburse_token reçu :", disburseInvoice);
-
-    // Génération OTP
+    // Génération OTP (le paiement DiokoLink sera effectué à la confirmation)
     const reference = generateReference(adminId);
     const otp = generateOTP();
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
 
-   /*  console.log("🔐 OTP généré :", otp);
-    console.log("📌 Référence :", reference);
-    console.log("⏳ Expiration OTP :", expiresAt); */
-
-    // Stocker OTP
     otpStore.set(adminId.toString(), {
       code: otp,
       expiresAt,
       reference,
       amount: parsedAmount,
       phoneNumber,
-      paymentMethod,
-      disburseInvoice
+      paymentMethod
     });
-    //console.log("🗄️ OTP stocké pour :", adminId);
 
-    // Envoi OTP via WhatsApp
     if (actionnaire.telephone) {
       const message = `Code UniversallFab: ${otp} Retrait de ${parsedAmount.toLocaleString()} FCFA vers ${phoneNumber} Valide 5 minutes.`;
-      //console.log("📨 Envoi OTP WhatsApp :", message);
       try {
         await sendWhatsAppMessage(actionnaire.telephone, message);
-       // console.log("🟩 OTP envoyé avec succès !");
       } catch (error) {
         console.warn("⚠️ Échec envoi OTP :", error.message);
       }
     }
-
-    //console.log("✅ Retrait initialisé avec succès");
 
     return res.json({
       success: true,
@@ -191,7 +163,7 @@ exports.initiateDividendActionsWithdrawal = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ ERREUR INITIALE initiateDividendWithdrawal :", error);
+    console.error("❌ ERREUR INITIALE initiateDividendActionsWithdrawal :", error);
     return res.status(500).json({
       success: false,
       message: 'Erreur serveur'
@@ -200,16 +172,19 @@ exports.initiateDividendActionsWithdrawal = async (req, res) => {
 };
 exports.initiateDividendProjectWithdrawal = async (req, res) => {
   try {
-    //console.log("🔵 [INITIATE WITHDRAWAL] Requête reçue :", req.body);
-
     const { phoneNumber, amount, paymentMethod } = req.body;
     const adminId = req.user.id;
 
-    //console.log("👤 Admin ID :", adminId);
+    // Le superAdmin ne peut pas faire de retrait
+    const requestingAdmin = await User.findById(adminId);
+    if (requestingAdmin?.isTheSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Le super administrateur ne peut pas effectuer de retrait'
+      });
+    }
 
-    // Validation des paramètres
     if (!phoneNumber || !amount || !paymentMethod) {
-      console.warn("⚠️ Paramètres manquants :", req.body);
       return res.status(400).json({
         success: false,
         message: 'Paramètres manquants'
@@ -217,10 +192,8 @@ exports.initiateDividendProjectWithdrawal = async (req, res) => {
     }
 
     const parsedAmount = parseFloat(amount);
-    //console.log("💰 Montant parsé :", parsedAmount);
 
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      console.warn("⚠️ Montant invalide :", amount);
       return res.status(400).json({
         success: false,
         message: 'Montant invalide'
@@ -228,7 +201,6 @@ exports.initiateDividendProjectWithdrawal = async (req, res) => {
     }
 
     if (parsedAmount < MIN_WITHDRAWAL) {
-      console.warn(`⚠️ Montant en dessous du minimum (${MIN_WITHDRAWAL})`);
       return res.status(400).json({
         success: false,
         message: `Montant minimum: ${MIN_WITHDRAWAL} FCFA`
@@ -236,7 +208,6 @@ exports.initiateDividendProjectWithdrawal = async (req, res) => {
     }
 
     if (parsedAmount > MAX_WITHDRAWAL) {
-      console.warn(`⚠️ Montant au-dessus du maximum (${MAX_WITHDRAWAL})`);
       return res.status(400).json({
         success: false,
         message: `Montant maximum: ${MAX_WITHDRAWAL.toLocaleString()} FCFA`
@@ -244,13 +215,10 @@ exports.initiateDividendProjectWithdrawal = async (req, res) => {
     }
 
     const actionnaire = await User.findById(adminId);
-    //console.log("👤 Actionnaire trouvé :", actionnaire ? actionnaire._id : "Aucun");
 
     const availableDividend = parseFloat(actionnaire.dividende_project) || 0;
-    //console.log(`💵 Dividende disponible : ${availableDividend}`);
 
     if (availableDividend < parsedAmount) {
-      //console.warn("❌ Solde insuffisant", { available: availableDividend, requested: parsedAmount });
       return res.status(400).json({
         success: false,
         message: `Solde insuffisant. Disponible: ${availableDividend.toLocaleString()} FCFA`,
@@ -262,79 +230,28 @@ exports.initiateDividendProjectWithdrawal = async (req, res) => {
       });
     }
 
-    //console.log("🟦 Envoi de la requête PayDunya...");
-
-    let transferResult;
-    try {
-      transferResult = await transferToAgent({
-        account_alias: phoneNumber,
-        amount: parsedAmount,
-        withdraw_mode: paymentMethod,
-        callback_url: 'https://www.diokogroup.com'
-      });
-      //console.log("🟩 Réponse PayDunya :", transferResult);
-    } catch (error) {
-      console.error("❌ Erreur PayDunya :", error);
-      return res.status(400).json({
-        success: false,
-        message: 'Erreur lors de la création du retrait'
-      });
-    }
-
-    // ✅ Vérifier succès PayDunya
-    if (!transferResult || transferResult.response_code !== "00") {
-      console.error("❌ PayDunya échec :", transferResult);
-      return res.status(400).json({
-        success: false,
-        message: transferResult?.message || 'Erreur PayDunya'
-      });
-    }
-
-    // disburse_token = preuve de retrait en cours
-    const disburseInvoice = transferResult.disburse_token;
-    if (!disburseInvoice) {
-      console.error("❌ disburse_token manquant :", transferResult);
-      return res.status(400).json({
-        success: false,
-        message: 'Réponse PayDunya incomplète'
-      });
-    }
-    //console.log("📄 disburse_token reçu :", disburseInvoice);
-
-    // Génération OTP
+    // Génération OTP (paiement DiokoLink effectué à la confirmation)
     const reference = generateReference(adminId);
     const otp = generateOTP();
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
 
-   /*  console.log("🔐 OTP généré :", otp);
-    console.log("📌 Référence :", reference);
-    console.log("⏳ Expiration OTP :", expiresAt); */
-
-    // Stocker OTP
     otpStore.set(adminId.toString(), {
       code: otp,
       expiresAt,
       reference,
       amount: parsedAmount,
       phoneNumber,
-      paymentMethod,
-      disburseInvoice
+      paymentMethod
     });
-    //console.log("🗄️ OTP stocké pour :", adminId);
 
-    // Envoi OTP via WhatsApp
     if (actionnaire.telephone) {
       const message = `Code UniversallFab: ${otp} Retrait de ${parsedAmount.toLocaleString()} FCFA vers ${phoneNumber} Valide 5 minutes.`;
-      //console.log("📨 Envoi OTP WhatsApp :", message);
       try {
         await sendWhatsAppMessage(actionnaire.telephone, message);
-       // console.log("🟩 OTP envoyé avec succès !");
       } catch (error) {
         console.warn("⚠️ Échec envoi OTP :", error.message);
       }
     }
-
-    //console.log("✅ Retrait initialisé avec succès");
 
     return res.json({
       success: true,
@@ -351,7 +268,7 @@ exports.initiateDividendProjectWithdrawal = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ ERREUR INITIALE initiateDividendWithdrawal :", error);
+    console.error("❌ ERREUR INITIALE initiateDividendProjectWithdrawal :", error);
     return res.status(500).json({
       success: false,
       message: 'Erreur serveur'
@@ -425,35 +342,35 @@ const superAdmin = await User.findOne({ isTheSuperAdmin: true });
       });
     }
 
-    // Soumettre à PayDunya
-    const disbursementResult = await submitDisburseInvoice(otpData.disburseInvoice);
-    
-    // Vérifier le résultat
-    const isSuccess = disbursementResult.success && 
-      disbursementResult.data?.response_code === '00';
+    // Effectuer le virement via DiokoLink
+    const disbursementResult = await initializePayout(
+      otpData.phoneNumber,
+      otpData.amount,
+      mapPaymentMethod(otpData.paymentMethod),
+      otpData.reference,
+      { beneficiary_name: admin.firstName + ' ' + admin.lastName }
+    );
 
-    if (!isSuccess) {
+    if (!disbursementResult.success) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: disbursementResult.message || 'Transaction échouée'
+        message: disbursementResult.error || 'Erreur lors du virement DiokoLink'
       });
     }
 
     // Déterminer le statut
-  const paydounyaStatus = disbursementResult.data?.status;
+    const diokolinkStatus = disbursementResult.status;
     let transactionStatus = 'confirmed';
-   
-    if (paydounyaStatus === 'pending' || paydounyaStatus === 'processing') {
+    if (diokolinkStatus === 'pending' || diokolinkStatus === 'processing') {
       transactionStatus = 'pending';
-    }else if(paydounyaStatus === "failed"){
-       await session.abortTransaction();
+    } else if (diokolinkStatus === 'failed') {
+      await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: disbursementResult.message || 'Transaction échouée'
+        message: 'Transaction DiokoLink échouée'
       });
     }
-
 
     // Créer la transaction
     const transaction = new Transaction({
@@ -466,19 +383,17 @@ const superAdmin = await User.findOne({ isTheSuperAdmin: true });
       description: `Retrait dividendes ${otpData.amount.toLocaleString()} FCFA`,
       reference: otpData.reference,
       id_transaction: generateTransactionId(),
-      invoiceToken: otpData.disburseInvoice,
-      paydounyaReferenceId: disbursementResult.data?.transaction_id,
+      invoiceToken: disbursementResult.transaction_id,
+      paydounyaReferenceId: disbursementResult.transaction_id,
       token: crypto.randomBytes(16).toString('hex')
     });
-    
+
     await transaction.save({ session });
 
     // Mettre à jour les dividendes
     const newDividendCents = currentDividendCents - amountCents;
     admin.dividende_project = newDividendCents / 100;
-     superAdmin.dividende_actions = newDividendCents /100;
     await admin.save({ session });
-    await superAdmin.save({session})
 
     // Supprimer l'OTP
     otpStore.delete(adminId.toString());
@@ -598,32 +513,32 @@ exports.confirmDividendActionsWithdrawal = async (req, res) => {
       });
     }
 
-    // Soumettre à PayDunya
-    const disbursementResult = await submitDisburseInvoice(otpData.disburseInvoice);
-    
-    // Vérifier le résultat
-    const isSuccess = disbursementResult.success && 
-      disbursementResult.data?.response_code === '00';
+    // Effectuer le virement via DiokoLink
+    const disbursementResult = await initializePayout(
+      otpData.phoneNumber,
+      otpData.amount,
+      mapPaymentMethod(otpData.paymentMethod),
+      otpData.reference,
+      { beneficiary_name: admin.firstName + ' ' + admin.lastName }
+    );
 
-    if (!isSuccess) {
+    if (!disbursementResult.success) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: disbursementResult.message || 'Transaction échouée'
+        message: disbursementResult.error || 'Erreur lors du virement DiokoLink'
       });
     }
 
-    
-    const paydounyaStatus = disbursementResult.data?.status;
+    const diokolinkStatus = disbursementResult.status;
     let transactionStatus = 'confirmed';
-   
-    if (paydounyaStatus === 'pending' || paydounyaStatus === 'processing') {
+    if (diokolinkStatus === 'pending' || diokolinkStatus === 'processing') {
       transactionStatus = 'pending';
-    }else if(paydounyaStatus === "failed"){
-       await session.abortTransaction();
+    } else if (diokolinkStatus === 'failed') {
+      await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: disbursementResult.message || 'Transaction échouée'
+        message: 'Transaction DiokoLink échouée'
       });
     }
 
@@ -638,19 +553,18 @@ exports.confirmDividendActionsWithdrawal = async (req, res) => {
       description: `Retrait dividendes ${otpData.amount.toLocaleString()} FCFA`,
       reference: otpData.reference,
       id_transaction: generateTransactionId(),
-      invoiceToken: otpData.disburseInvoice,
-      paydounyaReferenceId: disbursementResult.data?.transaction_id,
+      invoiceToken: disbursementResult.transaction_id,
+      paydounyaReferenceId: disbursementResult.transaction_id,
       token: crypto.randomBytes(16).toString('hex')
     });
-    
+
     await transaction.save({ session });
 
     // Mettre à jour les dividendes
     const newDividendCents = currentDividendCents - amountCents;
     admin.dividende_actions = newDividendCents / 100;
-    superAdmin.dividende_actions = newDividendCents /100;
     await admin.save({ session });
-    await superAdmin.save({session})
+
     // Supprimer l'OTP
     otpStore.delete(adminId.toString());
 
@@ -735,20 +649,19 @@ exports.confirmDividendActionsWithdrawal = async (req, res) => {
 // Priorité aux dividendes actions
 if (owner.dividende_actions >= reste) {
   owner.dividende_actions -= reste;
-  superAdmin.dividende_actions -= reste;
+  if (superAdmin) superAdmin.dividende_actions -= reste;
   reste = 0;
 } else {
   reste -= owner.dividende_actions;
-  reste = superAdmin.dividende_actions;
   owner.dividende_actions = 0;
-  superAdmin.dividende_actions=0;
+  if (superAdmin) superAdmin.dividende_actions = 0;
 }
 
 // Puis on utilise dividende_project si nécessaire
 if (reste > 0) {
   if (owner.dividende_project >= reste) {
     owner.dividende_project -= reste;
-    superAdmin.dividende_project -= reste;
+    if (superAdmin) superAdmin.dividende_project -= reste;
     reste = 0;
   } else {
     // Solde insuffisant total
@@ -764,7 +677,7 @@ if (reste > 0) {
     });
 
     await owner.save();
-    await superAdmin.save()
+    if (superAdmin) await superAdmin.save();
 
     // 4️⃣ Message WhatsApp (si numéro présent)
     if (owner.telephone) {
@@ -878,45 +791,12 @@ exports.initiateActionnaireWithdrawal = async (req, res) => {
       });
     }
 
-    // Appel PayDunya
-    let transferResult;
-    try {
-      transferResult = await transferToAgent({
-        account_alias: phoneNumber,
-        amount: parsedAmount,
-        withdraw_mode: paymentMethod,
-        callback_url: 'https://www.diokogroup.com'
-      });
-    } catch (error) {
-      console.error("Erreur PayDunya :", error);
-      return res.status(400).json({
-        success: false,
-        message: 'Erreur lors de la création du retrait'
-      });
-    }
-
-    // Vérifier succès PayDunya
-    if (!transferResult || transferResult.response_code !== "00") {
-      return res.status(400).json({
-        success: false,
-        message: transferResult?.message || 'Erreur PayDunya'
-      });
-    }
-
-    const disburseInvoice = transferResult.disburse_token;
-    if (!disburseInvoice) {
-      return res.status(400).json({
-        success: false,
-        message: 'Réponse PayDunya incomplète'
-      });
-    }
-
-    // Génération OTP
+    // Génération OTP (le virement DiokoLink sera effectué à la confirmation)
     const reference = generateReference(userId);
     const otp = generateOTP();
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
 
-    // Stocker OTP avec type 'actionnaire' et les IDs nécessaires
+    // Stocker OTP
     otpStore.set(userId.toString(), {
       code: otp,
       expiresAt,
@@ -924,7 +804,6 @@ exports.initiateActionnaireWithdrawal = async (req, res) => {
       amount: parsedAmount,
       phoneNumber,
       paymentMethod,
-      disburseInvoice,
       type: 'actionnaire',
       ownerId: owner._id
     });
@@ -1054,35 +933,35 @@ exports.confirmActionnaireWithdrawal = async (req, res) => {
       });
     }
 
-    // Soumettre à PayDunya
-    const disbursementResult = await submitDisburseInvoice(otpData.disburseInvoice);
+    // Effectuer le virement via DiokoLink
+    const disbursementResult = await initializePayout(
+      otpData.phoneNumber,
+      otpData.amount,
+      mapPaymentMethod(otpData.paymentMethod),
+      otpData.reference,
+      { beneficiary_name: actionnaire.firstName + ' ' + actionnaire.lastName }
+    );
 
-    // Vérifier le résultat
-    const isSuccess = disbursementResult.success &&
-      disbursementResult.data?.response_code === '00';
-
-    if (!isSuccess) {
+    if (!disbursementResult.success) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: disbursementResult.message || 'Transaction échouée'
+        message: disbursementResult.error || 'Erreur lors du virement DiokoLink'
       });
     }
 
     // Déterminer le statut
-   const paydounyaStatus = disbursementResult.data?.status;
+    const diokolinkStatus = disbursementResult.status;
     let transactionStatus = 'confirmed';
-   
-    if (paydounyaStatus === 'pending' || paydounyaStatus === 'processing') {
+    if (diokolinkStatus === 'pending' || diokolinkStatus === 'processing') {
       transactionStatus = 'pending';
-    }else if(paydounyaStatus === "failed"){
-       await session.abortTransaction();
+    } else if (diokolinkStatus === 'failed') {
+      await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: disbursementResult.message || 'Transaction échouée'
+        message: 'Transaction DiokoLink échouée'
       });
     }
-
 
     // Créer la transaction
     const transaction = new Transaction({
@@ -1095,8 +974,8 @@ exports.confirmActionnaireWithdrawal = async (req, res) => {
       description: `Retrait dividendes actionnaire ${otpData.amount.toLocaleString()} FCFA`,
       reference: otpData.reference,
       id_transaction: generateTransactionId(),
-      invoiceToken: otpData.disburseInvoice,
-      paydounyaReferenceId: disbursementResult.data?.transaction_id,
+      invoiceToken: disbursementResult.transaction_id,
+      paydounyaReferenceId: disbursementResult.transaction_id,
       token: crypto.randomBytes(16).toString('hex')
     });
 
@@ -1126,17 +1005,7 @@ exports.confirmActionnaireWithdrawal = async (req, res) => {
     await session.commitTransaction();
 
     // Notification WhatsApp
-    if (actionnaire.telephone) {
-      const message = transactionStatus === 'confirmed'
-        ? `Retrait confirmé !\nMontant: ${otpData.amount.toLocaleString()} FCFA\nVers: ${otpData.phoneNumber}\nRéférence: ${otpData.reference}\nNouveau solde: ${(newDividendCents / 100).toLocaleString()} FCFA`
-        : `Retrait en cours de traitement\nMontant: ${otpData.amount.toLocaleString()} FCFA\nVers: ${otpData.phoneNumber}\nRéférence: ${otpData.reference}`;
-
-      try {
-        await sendWhatsAppMessage(actionnaire.telephone, message);
-      } catch (error) {
-        console.warn('Erreur notification:', error.message);
-      }
-    }
+   
 
     // Réponse
     return res.json({
