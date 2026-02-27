@@ -1,6 +1,6 @@
 const User = require("../Models/UserModel");
 const Project = require("../Models/ProjectModel");
-const { createInvoice } = require("../Services/paydunya");
+const { initializePayment } = require("../Services/diokolinkService");
 const Transaction = require("../Models/TransactionModel");
 const MAIN_ADMIN_ID = process.env.MAIN_ADMIN_ID
 const callbackurl=process.env.BACKEND_URL
@@ -125,30 +125,48 @@ module.exports.giveYourDividendToTheProject = async (req, res) => {
       })
     );
 
-    const items = [
-  { name: `Participation projet `, unit_price: amount }
-];
-  const invoice = await createInvoice({
-  items,
-  totalAmount: amount,
-   callbackUrl: `${callbackurl}/api/ipn`
-});
-const TransactionRecord = await Transaction.create({
+    const user = await User.findById(userId);
+    const customer = {
+      name: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Actionnaire',
+      email: user?.email || `${user?.telephone}@dioko.com`,
+      phone: user?.telephone || ''
+    };
+    const reference = `PRJ-${userId}-${Date.now()}`;
+
+    const paymentResponse = await initializePayment(
+      amount,
+      'link',
+      customer,
+      reference,
+      null,
+      { project_ids: projectIds.join(','), user_id: userId.toString() }
+    );
+
+    if (!paymentResponse.success) {
+      throw new Error(paymentResponse.error || 'Erreur création paiement DiokoLink');
+    }
+
+    const TransactionRecord = await Transaction.create({
       userId,
       projectIds,
       amount,
-      status: "pending", // paiement pas encore confirmé
+      status: "pending",
       description: `Participation aux projets ${projectIds.join(", ")}. Paiement en attente.`,
-      invoiceToken: invoice.token, 
+      invoiceToken: paymentResponse.transaction_id,
     });
 
     res.status(200).json({
-      success:true,
+      success: true,
       message: "Participation enregistrée et paiement déclenché. Attente de validation.",
       userId,
       updatedProjects: updatedProjects.filter(Boolean),
       TransactionRecord,
-      invoice,
+      invoice: {
+        token: paymentResponse.transaction_id,
+        response_text: paymentResponse.payment_url,
+        payment_url: paymentResponse.payment_url,
+        transaction_id: paymentResponse.transaction_id
+      },
     });
   } catch (error) {
     console.error("Erreur dans giveYourDividendToTheProject:", error);
