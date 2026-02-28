@@ -113,7 +113,8 @@ const extractDiokolinkData = (body) => {
     return { token, rawStatus };
 };
 
-// Callback pour paiement de projets (DiokoLink)
+// Callback universel (DiokoLink envoie tout vers /ipn)
+// Détecte automatiquement si c'est un achat d'actions ou un versement projet
 module.exports.handlePaymentCallback = async (req, res) => {
     try {
         const body = req.body;
@@ -138,7 +139,25 @@ module.exports.handlePaymentCallback = async (req, res) => {
             status = mapDiokolinkStatus(rawStatus);
         }
 
-        const result = await updateStatusPayemt(invoiceToken, status);
+        // Détecter le type de transaction via la DB
+        const Transaction = require('../Models/TransactionModel');
+        const transaction = await Transaction.findOne({ invoiceToken });
+
+        if (!transaction) {
+            console.error(`❌ Aucune transaction trouvée pour le token: ${invoiceToken}`);
+            return res.status(404).json({ message: "Transaction introuvable" });
+        }
+
+        let result;
+        // Si la transaction a un champ "actions" rempli → c'est un achat d'actions
+        if (transaction.actions) {
+            console.log(`🎯 Token ${invoiceToken} → achat d'actions, appel updateStatusBuyAction`);
+            result = await updateStatusBuyAction(invoiceToken, status);
+        } else {
+            // Sinon → c'est un versement projet
+            console.log(`🎯 Token ${invoiceToken} → versement projet, appel updateStatusPayemt`);
+            result = await updateStatusPayemt(invoiceToken, status);
+        }
 
         if (result.error) {
             return res.status(result.statusCode).json({ message: result.message });
