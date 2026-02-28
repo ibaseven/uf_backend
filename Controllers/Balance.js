@@ -841,7 +841,7 @@ exports.initiateActionnaireWithdrawal = async (req, res) => {
   }
 };
 
-// Confirmer un retrait de dividendes pour un actionnaire
+// Confirmer un retrait de dividendes pour un actionnairefffd
 exports.confirmActionnaireWithdrawal = async (req, res) => {
   const session = await mongoose.startSession();
 
