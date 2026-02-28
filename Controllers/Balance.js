@@ -287,7 +287,7 @@ exports.confirmDividendProjectWithdrawal = async (req, res) => {
     const adminId = req.user.id;
 
     const admin = await User.findById(adminId).session(session);
-const superAdmin = await User.findOne({ isTheSuperAdmin: true });
+    const superAdmin = await User.findOne({ isTheSuperAdmin: true }).session(session);
     // Vérifier les données stockées
     const otpData = otpStore.get(adminId.toString());
 
@@ -395,6 +395,13 @@ const superAdmin = await User.findOne({ isTheSuperAdmin: true });
     admin.dividende_project = newDividendCents / 100;
     await admin.save({ session });
 
+    // Mettre à jour le superAdmin si existant
+    if (superAdmin) {
+      const superAdminDividendeCents = Math.round((superAdmin.dividende_project || 0) * 100);
+      superAdmin.dividende_project = (superAdminDividendeCents - amountCents) / 100;
+      await superAdmin.save({ session });
+    }
+
     // Supprimer l'OTP
     otpStore.delete(adminId.toString());
 
@@ -406,7 +413,7 @@ const superAdmin = await User.findOne({ isTheSuperAdmin: true });
       const message = transactionStatus === 'completed'
         ? `Retrait confirmé ! Montant: ${otpData.amount.toLocaleString()} FCFA Vers: ${otpData.phoneNumber} Référence: ${otpData.reference} Solde: ${(newDividendCents / 100).toLocaleString()} FCFA`
         : `Retrait en cours Montant: ${otpData.amount.toLocaleString()} FCFA Vers: ${otpData.phoneNumber} Référence: ${otpData.reference}`;
-      
+
       try {
         await sendWhatsAppMessage(actionnaire.telephone, message);
       } catch (error) {
@@ -417,8 +424,8 @@ const superAdmin = await User.findOne({ isTheSuperAdmin: true });
     // Réponse
     return res.json({
       success: true,
-      message: transactionStatus === 'completed' 
-        ? 'Retrait effectué avec succès' 
+      message: transactionStatus === 'completed'
+        ? 'Retrait effectué avec succès'
         : 'Retrait en cours de traitement',
       transaction: {
         id: transaction._id,
@@ -432,18 +439,18 @@ const superAdmin = await User.findOne({ isTheSuperAdmin: true });
         remaining: newDividendCents / 100
       }
     });
-    
+
   } catch (error) {
     if (session.inTransaction()) {
       await session.abortTransaction();
     }
-    
+
     console.error('❌ Erreur confirmation:', error);
-    return res.status(500).json({ 
-      success: false, 
+    return res.status(500).json({
+      success: false,
       message: 'Erreur serveur'
     });
-    
+
   } finally {
     session.endSession();
   }
@@ -458,7 +465,7 @@ exports.confirmDividendActionsWithdrawal = async (req, res) => {
     const adminId = req.user.id;
 
     const admin = await User.findById(adminId).session(session);
-    const superAdmin = await User.findOne({ isTheSuperAdmin: true });
+    const superAdmin = await User.findOne({ isTheSuperAdmin: true }).session(session);
     // Vérifier les données stockées
     const otpData = otpStore.get(adminId.toString());
 
@@ -564,6 +571,13 @@ exports.confirmDividendActionsWithdrawal = async (req, res) => {
     const newDividendCents = currentDividendCents - amountCents;
     admin.dividende_actions = newDividendCents / 100;
     await admin.save({ session });
+
+    // Mettre à jour le superAdmin si existant
+    if (superAdmin) {
+      const superAdminDividendeCents = Math.round((superAdmin.dividende_actions || 0) * 100);
+      superAdmin.dividende_actions = (superAdminDividendeCents - amountCents) / 100;
+      await superAdmin.save({ session });
+    }
 
     // Supprimer l'OTP
     otpStore.delete(adminId.toString());
