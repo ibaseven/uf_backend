@@ -309,7 +309,8 @@ module.exports.getMyProfile = async (req, res) => {
         role: user.role,
         dividende: user.dividende,
         actionsNumber:user.actionsNumber,
-        isTheSuperAdmin:user.isTheSuperAdmin
+        isTheSuperAdmin:user.isTheSuperAdmin,
+        isTheOwner:user.isTheOwner
       },
       statistics: {
         totalInvested,
