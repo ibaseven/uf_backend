@@ -108,6 +108,8 @@ const initializePayout = async (accountAlias, amount, paymentMethod, reference, 
         : `+221${normalizedPhone}`;
     }
 
+    const callbackUrl = `${DIOKOLINK_CONFIG.CALLBACK_URL}/api/ipn-payout`;
+
     const payload = {
       amount: amount,
       currency: 'XOF',
@@ -117,6 +119,7 @@ const initializePayout = async (accountAlias, amount, paymentMethod, reference, 
         name: metadata.beneficiary_name || 'Actionnaire Dioko'
       },
       reference: reference,
+      callback_url: callbackUrl,
       metadata: metadata
     };
 

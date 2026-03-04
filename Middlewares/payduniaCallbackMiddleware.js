@@ -1,7 +1,6 @@
 require("dotenv").config();
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
-const { validateWebhookSignature } = require("../Config/diokolink");
 
 // Rate limiting
 const paydunyaCallbackLimiter = rateLimit({
@@ -13,7 +12,8 @@ const paydunyaCallbackLimiter = rateLimit({
     validate: { xForwardedForHeader: false }
 });
 
-// Middleware de vérification du webhook DiokoLink (HMAC-SHA256)
+// Middleware de vérification du webhook PayDunya
+// PayDunya envoie un hash MD5 de la MASTER_KEY dans le body : body.data.hash
 const verifyPaydunyaCallback = (req, res, next) => {
     try {
         const body = req.body;
@@ -22,26 +22,39 @@ const verifyPaydunyaCallback = (req, res, next) => {
             return res.status(400).json({ message: "Body invalide" });
         }
 
-        // Logger les headers pour debug
-        console.log("📥 Webhook headers:", JSON.stringify(req.headers));
+        //console.log("📥 IPN PayDunya reçu:", JSON.stringify(body, null, 2));
 
-        // Récupérer la signature depuis les headers DiokoLink
-        const signature = req.headers["x-webhook-signature"]
-            || req.headers["x-signature"]
-            || req.headers["x-diokolink-signature"];
+        const masterKey = process.env.PAYDUNYA_MASTER_KEY;
+        if (!masterKey) {
+            console.error("❌ PAYDUNYA_MASTER_KEY manquante dans .env");
+            return res.status(500).json({ message: "Configuration serveur incorrecte" });
+        }
 
-        // Log pour debug
-        const rawBody = req.rawBody || JSON.stringify(body);
-        console.log("📦 Webhook body complet:", JSON.stringify(body, null, 2));
-        console.log("🔑 Signature reçue:", signature);
+        // PayDunya envoie le hash dans body.data.hash (collect) ou body.hash (disburse)
+        const receivedHash = body?.data?.hash || body?.hash;
 
-        // TODO: réactiver la vérification une fois l'algorithme DiokoLink confirmé
-        // Pour l'instant on bypasse pour tester le flux complet
+        if (!receivedHash) {
+            // Pas de hash → callback sans vérification (ex: test manuel)
+            console.warn("⚠️ IPN sans hash PayDunya — passage sans vérification");
+            return next();
+        }
 
+        // Vérification : SHA-512(PAYDUNYA_MASTER_KEY) doit correspondre au hash reçu
+        const expectedHash = crypto
+            .createHash("sha512")
+            .update(masterKey)
+            .digest("hex");
+
+        if (receivedHash !== expectedHash) {
+            console.error("❌ Hash PayDunya invalide:", { received: receivedHash, expected: expectedHash });
+            return res.status(401).json({ message: "Signature IPN invalide" });
+        }
+
+        console.log("✅ IPN PayDunya vérifié");
         next();
 
     } catch (error) {
-        console.error("❌ Erreur vérification callback DiokoLink:", error);
+        console.error("❌ Erreur vérification IPN PayDunya:", error);
         return res.status(500).json({ message: "Erreur de vérification" });
     }
 };
