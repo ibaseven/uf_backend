@@ -2,33 +2,32 @@ const mongoose = require('mongoose');
 const crypto = require('crypto');
 const User = require('../Models/UserModel');
 const Transaction = require('../Models/TransactionModel');
-const { initializePayout } = require('../Services/diokolinkService');
+const { transferToAgent, submitDisburseInvoice } = require('../Services/paydunya');
 const { sendWhatsAppMessage } = require('../utils/Whatsapp');
 
 
 
 const otpStore = new Map();
 
-// Mapping des codes collect (frontend) → codes payout DiokoLink
-const PAYOUT_METHOD_MAP = {
-  'wave_sn_paydunya':       'wave_sn_payout_paydunya',
-  'om_sn_paydunya':         'om_sn_payout_paydunya',
-  'free_money_sn_paydunya': 'free_sn_payout_paydunya',
-  'wave_ci_paydunya':       'wave_ci_payout_paydunya',
-  'om_ci_paydunya':         'om_ci_payout_paydunya',
-  'mtn_ci_paydunya':        'mtn_ci_payout_paydunya',
-  'moov_ci_paydunya':       'moov_ci_payout_paydunya',
-  'mtn_bj_paydunya':        'mtn_bj_payout_paydunya',
-  'moov_bj_paydunya':       'moov_bj_payout_paydunya',
-  't_money_tg_paydunya':    't_money_tg_payout_paydunya',
-  'moov_tg_paydunya':       'moov_tg_payout_paydunya',
-  'om_ml_paydunya':         'om_ml_payout_paydunya',
-  'moov_ml_paydunya':       'moov_ml_payout_paydunya',
-  'om_bf_paydunya':         'om_bf_payout_paydunya',
-  'moov_bf_paydunya':       'moov_bf_payout_paydunya',
+// Mapping des codes frontend → withdraw_mode PayDunya disburse
+const PAYDUNYA_DISBURSE_METHOD_MAP = {
+  'wave_sn_paydunya':       'wave-senegal',
+  'om_sn_paydunya':         'orange-money-senegal',
+  'free_money_sn_paydunya': 'free-money-senegal',
+  'expresso_sn_paydunya':   'expresso-senegal',
+  'wave_ci_paydunya':       'wave-ci',
+  'om_ci_paydunya':         'orange-money-ci',
+  'mtn_ci_paydunya':        'mtn-ci',
+  'moov_ci_paydunya':       'moov-ci',
+  'mtn_bj_paydunya':        'mtn-benin',
+  'moov_bj_paydunya':       'moov-benin',
+  't_money_tg_paydunya':    't-money-togo',
+  'moov_tg_paydunya':       'moov-togo',
+  'om_ml_paydunya':         'orange-money-mali',
+  'om_bf_paydunya':         'orange-money-burkina',
+  'moov_bf_paydunya':       'moov-burkina-faso',
 };
-
-const mapPaymentMethod = (method) => PAYOUT_METHOD_MAP[method] || method;
+const mapPaydunyaMethod = (method) => PAYDUNYA_DISBURSE_METHOD_MAP[method] || method;
 
 
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
@@ -342,35 +341,54 @@ exports.confirmDividendProjectWithdrawal = async (req, res) => {
       });
     }
 
-    // Effectuer le virement via DiokoLink
-    const disbursementResult = await initializePayout(
-      otpData.phoneNumber,
-      otpData.amount,
-      mapPaymentMethod(otpData.paymentMethod),
-      otpData.reference,
-      { beneficiary_name: admin.firstName + ' ' + admin.lastName }
-    );
-
-    if (!disbursementResult.success) {
+    // Effectuer le virement via PayDunya (étape 1 : obtenir l'invoice)
+    let transferResultProject;
+    try {
+      transferResultProject = await transferToAgent({
+        account_alias: otpData.phoneNumber,
+        amount: otpData.amount,
+        withdraw_mode: mapPaydunyaMethod(otpData.paymentMethod),
+        callback_url: `${process.env.BACKEND_URL}/api/ipn-payout`
+      });
+    } catch (transferErr) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: disbursementResult.error || 'Erreur lors du virement DiokoLink'
+        message: transferErr.response?.data?.description || transferErr.message || 'Erreur transfert PayDunya'
       });
     }
 
-    // Déterminer le statut
-    const diokolinkStatus = disbursementResult.status;
-    let transactionStatus = 'confirmed';
-    if (diokolinkStatus === 'pending' || diokolinkStatus === 'processing') {
-      transactionStatus = 'pending';
-    } else if (diokolinkStatus === 'failed') {
+    console.log('🔍 PayDunya transferToAgent response (project):', JSON.stringify(transferResultProject));
+
+    if (!transferResultProject || transferResultProject.response_code !== '00') {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: 'Transaction DiokoLink échouée'
+        message: transferResultProject?.description || transferResultProject?.response_text || 'Erreur transfert PayDunya'
       });
     }
+
+    const disburseInvoiceProject = transferResultProject.disburse_token || transferResultProject.disburse_invoice || transferResultProject.token;
+
+    if (!disburseInvoiceProject) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Token de décaissement PayDunya introuvable dans la réponse'
+      });
+    }
+
+    // Étape 2 : soumettre l'invoice
+    const submitResultProject = await submitDisburseInvoice(disburseInvoiceProject);
+    if (!submitResultProject.success) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: submitResultProject.error || 'Erreur soumission paiement PayDunya'
+      });
+    }
+
+    const transactionStatus = 'pending';
 
     // Créer la transaction
     const transaction = new Transaction({
@@ -383,8 +401,8 @@ exports.confirmDividendProjectWithdrawal = async (req, res) => {
       description: `Retrait dividendes ${otpData.amount.toLocaleString()} FCFA`,
       reference: otpData.reference,
       id_transaction: generateTransactionId(),
-      invoiceToken: disbursementResult.transaction_id,
-      paydounyaReferenceId: disbursementResult.transaction_id,
+      invoiceToken: disburseInvoiceProject,
+      paydounyaReferenceId: transferResultProject.disburse_id || transferResultProject.disburse_token || disburseInvoiceProject,
       token: crypto.randomBytes(16).toString('hex')
     });
 
@@ -520,34 +538,54 @@ exports.confirmDividendActionsWithdrawal = async (req, res) => {
       });
     }
 
-    // Effectuer le virement via DiokoLink
-    const disbursementResult = await initializePayout(
-      otpData.phoneNumber,
-      otpData.amount,
-      mapPaymentMethod(otpData.paymentMethod),
-      otpData.reference,
-      { beneficiary_name: admin.firstName + ' ' + admin.lastName }
-    );
-
-    if (!disbursementResult.success) {
+    // Effectuer le virement via PayDunya (étape 1 : obtenir l'invoice)
+    let transferResultActions;
+    try {
+      transferResultActions = await transferToAgent({
+        account_alias: otpData.phoneNumber,
+        amount: otpData.amount,
+        withdraw_mode: mapPaydunyaMethod(otpData.paymentMethod),
+        callback_url: `${process.env.BACKEND_URL}/api/ipn-payout`
+      });
+    } catch (transferErr) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: disbursementResult.error || 'Erreur lors du virement DiokoLink'
+        message: transferErr.response?.data?.description || transferErr.message || 'Erreur transfert PayDunya'
       });
     }
 
-    const diokolinkStatus = disbursementResult.status;
-    let transactionStatus = 'confirmed';
-    if (diokolinkStatus === 'pending' || diokolinkStatus === 'processing') {
-      transactionStatus = 'pending';
-    } else if (diokolinkStatus === 'failed') {
+    console.log('🔍 PayDunya transferToAgent response (actions):', JSON.stringify(transferResultActions));
+
+    if (!transferResultActions || transferResultActions.response_code !== '00') {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: 'Transaction DiokoLink échouée'
+        message: transferResultActions?.description || transferResultActions?.response_text || 'Erreur transfert PayDunya'
       });
     }
+
+    const disburseInvoiceActions = transferResultActions.disburse_token || transferResultActions.disburse_invoice || transferResultActions.token;
+
+    if (!disburseInvoiceActions) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Token de décaissement PayDunya introuvable dans la réponse'
+      });
+    }
+
+    // Étape 2 : soumettre l'invoice
+    const submitResultActions = await submitDisburseInvoice(disburseInvoiceActions);
+    if (!submitResultActions.success) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: submitResultActions.error || 'Erreur soumission paiement PayDunya'
+      });
+    }
+
+    const transactionStatus = 'pending';
 
     // Créer la transaction
     const transaction = new Transaction({
@@ -560,8 +598,8 @@ exports.confirmDividendActionsWithdrawal = async (req, res) => {
       description: `Retrait dividendes ${otpData.amount.toLocaleString()} FCFA`,
       reference: otpData.reference,
       id_transaction: generateTransactionId(),
-      invoiceToken: disbursementResult.transaction_id,
-      paydounyaReferenceId: disbursementResult.transaction_id,
+      invoiceToken: disburseInvoiceActions,
+      paydounyaReferenceId: transferResultActions.disburse_id || transferResultActions.disburse_token || disburseInvoiceActions,
       token: crypto.randomBytes(16).toString('hex')
     });
 
@@ -947,35 +985,55 @@ exports.confirmActionnaireWithdrawal = async (req, res) => {
       });
     }
 
-    // Effectuer le virement via DiokoLink
-    const disbursementResult = await initializePayout(
-      otpData.phoneNumber,
-      otpData.amount,
-      mapPaymentMethod(otpData.paymentMethod),
-      otpData.reference,
-      { beneficiary_name: actionnaire.firstName + ' ' + actionnaire.lastName }
-    );
-
-    if (!disbursementResult.success) {
+    // Effectuer le virement via PayDunya (étape 1 : obtenir l'invoice de décaissement)
+    let transferResult;
+    try {
+      transferResult = await transferToAgent({
+        account_alias: otpData.phoneNumber,
+        amount: otpData.amount,
+        withdraw_mode: mapPaydunyaMethod(otpData.paymentMethod),
+        callback_url: `${process.env.BACKEND_URL}/api/ipn-payout`
+      });
+    } catch (transferErr) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: disbursementResult.error || 'Erreur lors du virement DiokoLink'
+        message: transferErr.response?.data?.description || transferErr.message || 'Erreur lors du transfert PayDunya'
       });
     }
 
-    // Déterminer le statut
-    const diokolinkStatus = disbursementResult.status;
-    let transactionStatus = 'confirmed';
-    if (diokolinkStatus === 'pending' || diokolinkStatus === 'processing') {
-      transactionStatus = 'pending';
-    } else if (diokolinkStatus === 'failed') {
+    console.log('🔍 PayDunya transferToAgent response (actionnaire):', JSON.stringify(transferResult));
+
+    if (!transferResult || transferResult.response_code !== '00') {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: 'Transaction DiokoLink échouée'
+        message: transferResult?.description || transferResult?.response_text || 'Erreur transfert PayDunya'
       });
     }
+
+    const disburseInvoice = transferResult.disburse_token || transferResult.disburse_invoice || transferResult.token;
+
+    if (!disburseInvoice) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Token de décaissement PayDunya introuvable dans la réponse'
+      });
+    }
+
+    // Étape 2 : soumettre l'invoice pour exécuter le décaissement
+    const submitResult = await submitDisburseInvoice(disburseInvoice);
+    if (!submitResult.success) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: submitResult.error || 'Erreur soumission paiement PayDunya'
+      });
+    }
+
+    // PayDunya traite les décaissements de façon asynchrone (toujours pending au départ)
+    const transactionStatus = 'pending';
 
     // Créer la transaction
     const transaction = new Transaction({
@@ -988,8 +1046,8 @@ exports.confirmActionnaireWithdrawal = async (req, res) => {
       description: `Retrait dividendes actionnaire ${otpData.amount.toLocaleString()} FCFA`,
       reference: otpData.reference,
       id_transaction: generateTransactionId(),
-      invoiceToken: disbursementResult.transaction_id,
-      paydounyaReferenceId: disbursementResult.transaction_id,
+      invoiceToken: disburseInvoice,
+      paydounyaReferenceId: transferResult.disburse_id || transferResult.disburse_token || disburseInvoice,
       token: crypto.randomBytes(16).toString('hex')
     });
 

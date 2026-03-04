@@ -4,7 +4,7 @@ const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, create
 const { participateProject, giveYourDividendToTheProject, getProjectByUser } = require("../Controllers/UserProjectController");
 const { authenticateTokenAndUserData, authenticateUser, adminRole, authenticateAdmin } = require("../Middlewares/VerifyToken");
 const { createProject, getAllProject, getProjectParticipants, decreaseParticipantPacks, increaseParticipantPacks, updateProject, deleteProject, assignUserToProject, unassignUserFromProject, getProjectsForUser } = require("../Controllers/ProjectController");
-const { handlePaymentCallback, handleBuyActionsCallback, confirmPaymentManually } = require("../Controllers/paymentCallbackController");
+const { handlePaymentCallback, handleBuyActionsCallback, confirmPaymentManually, handlePayoutCallback } = require("../Controllers/paymentCallbackController");
 const { buyAction, buyActionWithDividends } = require("../Controllers/ActionController");
 const { bulkCreateUsersFromPDF, uploadPDF } = require("../utils/bulkCreateUsers");
 const { getAllTransactionsByUser, getAllTransactions, getTransactionsByProcess } = require("../Controllers/TransactionController");
@@ -53,6 +53,7 @@ router.get("/getAllTransactions",authenticateUser,getAllTransactions)
 router.post('/bulk-import', uploadPDF, previewPdfImport);
 router.post("/ipnpayment",paydunyaCallbackLimiter,verifyPaydunyaCallback,handleBuyActionsCallback)
 //router.post("/ipnpayment",payduniaCallbackLimiter,handleBuyActionsCallback)
+//router.post("/ipn-payout", handlePayoutCallback)
 router.post("/createAdmin",createAdmin)
 router.get("/get-user/:id",authenticateUser,getUserById);
 router.get("/get-admin",adminRole,getUserBalance);
