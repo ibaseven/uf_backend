@@ -1,7 +1,8 @@
 const User = require("../Models/UserModel");
 const Project = require("../Models/ProjectModel");
-const { initializePayment } = require("../Services/diokolinkService");
+const { createInvoice } = require("../Services/paydunya");
 const Transaction = require("../Models/TransactionModel");
+const Settings = require("../Models/SettingsModel");
 const MAIN_ADMIN_ID = process.env.MAIN_ADMIN_ID
 const callbackurl=process.env.BACKEND_URL
 const mongoose = require('mongoose');
@@ -103,11 +104,17 @@ module.exports.participateProject = async (req, res) => {
 
 module.exports.giveYourDividendToTheProject = async (req, res) => {
   try {
-    const { projectIds, amount } = req.body; 
-    const userId =  req.user?.id; 
+    const { projectIds, amount } = req.body;
+    const userId =  req.user?.id;
 
     if (!userId) {
       return res.status(400).json({ message: "L'identifiant de l'utilisateur est requis." });
+    }
+
+    // Vérifier si les paiements projet sont bloqués
+    const blockSettings = await Settings.findOne();
+    if (blockSettings?.projectsBlocked) {
+      return res.status(403).json({ message: "Les paiements de projets sont temporairement suspendus." });
     }
 
     if (!Array.isArray(projectIds) || projectIds.length === 0) {
@@ -125,25 +132,14 @@ module.exports.giveYourDividendToTheProject = async (req, res) => {
       })
     );
 
-    const user = await User.findById(userId);
-    const customer = {
-      name: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Actionnaire',
-      email: user?.email || `${user?.telephone}@dioko.com`,
-      phone: user?.telephone || ''
-    };
-    const reference = `PRJ-${userId}-${Date.now()}`;
+    const invoice = await createInvoice({
+      items: [{ name: `Participation aux projets`, unit_price: amount }],
+      totalAmount: amount,
+      callbackUrl: `${process.env.BACKEND_URL}/api/ipn`
+    });
 
-    const paymentResponse = await initializePayment(
-      amount,
-      'link',
-      customer,
-      reference,
-      null,
-      { project_ids: projectIds.join(','), user_id: userId.toString() }
-    );
-
-    if (!paymentResponse.success) {
-      throw new Error(paymentResponse.error || 'Erreur création paiement DiokoLink');
+    if (!invoice || invoice.response_code !== '00') {
+      throw new Error(invoice?.description || 'Erreur création facture PayDunya');
     }
 
     const TransactionRecord = await Transaction.create({
@@ -152,7 +148,7 @@ module.exports.giveYourDividendToTheProject = async (req, res) => {
       amount,
       status: "pending",
       description: `Participation aux projets ${projectIds.join(", ")}. Paiement en attente.`,
-      invoiceToken: paymentResponse.transaction_id,
+      invoiceToken: invoice.token,
     });
 
     res.status(200).json({
@@ -162,10 +158,10 @@ module.exports.giveYourDividendToTheProject = async (req, res) => {
       updatedProjects: updatedProjects.filter(Boolean),
       TransactionRecord,
       invoice: {
-        token: paymentResponse.transaction_id,
-        response_text: paymentResponse.payment_url,
-        payment_url: paymentResponse.payment_url,
-        transaction_id: paymentResponse.transaction_id
+        token: invoice.token,
+        response_text: invoice.response_text,
+        payment_url: invoice.response_text,
+        transaction_id: invoice.token
       },
     });
   } catch (error) {

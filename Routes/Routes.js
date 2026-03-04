@@ -4,13 +4,13 @@ const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, create
 const { participateProject, giveYourDividendToTheProject, getProjectByUser } = require("../Controllers/UserProjectController");
 const { authenticateTokenAndUserData, authenticateUser, adminRole, authenticateAdmin } = require("../Middlewares/VerifyToken");
 const { createProject, getAllProject, getProjectParticipants, decreaseParticipantPacks, increaseParticipantPacks, updateProject, deleteProject, assignUserToProject, unassignUserFromProject, getProjectsForUser } = require("../Controllers/ProjectController");
-const { handlePaymentCallback, handleBuyActionsCallback, confirmPaymentManually } = require("../Controllers/paymentCallbackController");
+const { handlePaymentCallback, handleBuyActionsCallback, confirmPaymentManually, handlePayoutCallback } = require("../Controllers/paymentCallbackController");
 const { buyAction, buyActionWithDividends } = require("../Controllers/ActionController");
 const { bulkCreateUsersFromPDF, uploadPDF } = require("../utils/bulkCreateUsers");
 const { getAllTransactionsByUser, getAllTransactions, getTransactionsByProcess } = require("../Controllers/TransactionController");
 const { uploadImg } = require("../Middlewares/awsUpload");
 const { previewPdfImport } = require("../utils/test");
-const { updateActionPrice, getActionPrice } = require("../Controllers/SettingsController");
+const { updateActionPrice, getActionPrice, getSettings, toggleActionsBlock, toggleProjectsBlock } = require("../Controllers/SettingsController");
 const { payduniaCallbackLimiter, verifyPaydunyaCallback, paydunyaCallbackLimiter } = require("../Middlewares/payduniaCallbackMiddleware");
 const { initiateDividendWithdrawal, confirmDividendWithdrawal, initiateDividendActionsWithdrawal, initiateDividendProjectWithdrawal, confirmDividendProjectWithdrawal, confirmDividendActionsWithdrawal, initiateActionnaireWithdrawal, confirmActionnaireWithdrawal } = require("../Controllers/Balance");
 const { deducteTheFee } = require("../Controllers/feesController");
@@ -53,6 +53,7 @@ router.get("/getAllTransactions",authenticateUser,getAllTransactions)
 router.post('/bulk-import', uploadPDF, previewPdfImport);
 router.post("/ipnpayment",paydunyaCallbackLimiter,verifyPaydunyaCallback,handleBuyActionsCallback)
 //router.post("/ipnpayment",payduniaCallbackLimiter,handleBuyActionsCallback)
+//router.post("/ipn-payout", handlePayoutCallback)
 router.post("/createAdmin",createAdmin)
 router.get("/get-user/:id",authenticateUser,getUserById);
 router.get("/get-admin",adminRole,getUserBalance);
@@ -65,6 +66,9 @@ router.post('/verify-reset-otp', verifyOTPAndResetPassword);
 router.post("/reset-password/:resetToken", resetPassWord);
 router.put("/action/price", adminRole,updateActionPrice);
 router.get("/action/getPrice",getActionPrice);
+router.get("/settings", adminRole, getSettings);
+router.post("/settings/toggle-actions-block", adminRole, toggleActionsBlock);
+router.post("/settings/toggle-projects-block", adminRole, toggleProjectsBlock);
 router.put('/admin/users/:userId', authenticateUser, adminRole, updateUser);
 router.post("/dividends/withdrawActions/initiate" ,adminRole, initiateDividendActionsWithdrawal);
 router.post("/dividends/withdrawProjects/initiate" ,adminRole, initiateDividendProjectWithdrawal);
@@ -92,7 +96,7 @@ router.post('/send-passwords-actionnaires', sendPasswordsToActionnaires);
 // Routes pour les invitations WhatsApp
 router.post('/send-whatsapp-invitations', adminRole, sendInvitations);
 router.post('/send-whatsapp-invitation/:userId', adminRole, sendInvitationToActionnaire);
-router.post("/confirm", confirmPaymentManually);
+//router.post("/confirm", confirmPaymentManually);
 
 // Routes pour le retrait de dividendes des actionnaires
 router.post("/actionnaire/withdraw/initiate", authenticateUser, initiateActionnaireWithdrawal);
