@@ -552,6 +552,12 @@ module.exports.buyAction = async (req, res) => {
     const userId = req.user.id;
     const { actionNumber, parrainPhone } = req.body;
 
+    // Vérifier si l'achat d'actions est bloqué
+    const blockSettings = await Settings.findOne();
+    if (blockSettings?.actionsBlocked) {
+      return res.status(403).json({ message: "L'achat d'actions est temporairement suspendu." });
+    }
+
     // 1️⃣ Vérifier si l'utilisateur existe
     const user = await User.findById(userId);
     if (!user) {

@@ -2,6 +2,7 @@ const User = require("../Models/UserModel");
 const Project = require("../Models/ProjectModel");
 const { createInvoice } = require("../Services/paydunya");
 const Transaction = require("../Models/TransactionModel");
+const Settings = require("../Models/SettingsModel");
 const MAIN_ADMIN_ID = process.env.MAIN_ADMIN_ID
 const callbackurl=process.env.BACKEND_URL
 const mongoose = require('mongoose');
@@ -103,11 +104,17 @@ module.exports.participateProject = async (req, res) => {
 
 module.exports.giveYourDividendToTheProject = async (req, res) => {
   try {
-    const { projectIds, amount } = req.body; 
-    const userId =  req.user?.id; 
+    const { projectIds, amount } = req.body;
+    const userId =  req.user?.id;
 
     if (!userId) {
       return res.status(400).json({ message: "L'identifiant de l'utilisateur est requis." });
+    }
+
+    // Vérifier si les paiements projet sont bloqués
+    const blockSettings = await Settings.findOne();
+    if (blockSettings?.projectsBlocked) {
+      return res.status(403).json({ message: "Les paiements de projets sont temporairement suspendus." });
     }
 
     if (!Array.isArray(projectIds) || projectIds.length === 0) {
