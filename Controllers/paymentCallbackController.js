@@ -1,5 +1,6 @@
  const { updateStatusBuyAction } = require("./ActionController");
 const { updateStatusPayemt } = require("./UserProjectController");
+const { updateStatusMoratoireVersement } = require("./MoratoireController");
 const CallbackLog = require('../Models/CallbackLog');
 
 const { checkPaymentStatus } = require('../Services/diokolinkService');
@@ -223,6 +224,30 @@ module.exports.handleBuyActionsCallback = async (req, res) => {
 
 // Webhook pour les payouts DiokoLink (retraits de dividendes)
 // DiokoLink appelle ce endpoint quand un payout est complété/échoué
+// Callback URL pour les versements moratoires
+module.exports.handleMoratoireVersementCallback = async (req, res) => {
+  try {
+    const data = req.body.data;
+    if (!data?.invoice?.token) {
+      return res.status(400).json({ message: "Données de callback invalides" });
+    }
+
+    const invoiceToken = data.invoice.token;
+    const status = data.status;
+
+    const result = await updateStatusMoratoireVersement(invoiceToken, status);
+
+    if (result.error) {
+      return res.status(result.statusCode).json({ message: result.message });
+    }
+
+    return res.status(200).json({ message: result.message, success: true });
+  } catch (err) {
+    console.error("Erreur callback moratoire:", err);
+    res.status(500).json({ message: "Erreur serveur", error: err.message });
+  }
+};
+
 module.exports.handlePayoutCallback = async (req, res) => {
     try {
         const body = req.body;
