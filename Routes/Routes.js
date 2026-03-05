@@ -4,7 +4,8 @@ const { checkAndGetUserByToken, CreateAccount, SignAccount, getMyProfile, create
 const { participateProject, giveYourDividendToTheProject, getProjectByUser } = require("../Controllers/UserProjectController");
 const { authenticateTokenAndUserData, authenticateUser, adminRole, authenticateAdmin } = require("../Middlewares/VerifyToken");
 const { createProject, getAllProject, getProjectParticipants, decreaseParticipantPacks, increaseParticipantPacks, updateProject, deleteProject, assignUserToProject, unassignUserFromProject, getProjectsForUser } = require("../Controllers/ProjectController");
-const { handlePaymentCallback, handleBuyActionsCallback, confirmPaymentManually, handlePayoutCallback } = require("../Controllers/paymentCallbackController");
+const { handlePaymentCallback, handleBuyActionsCallback, confirmPaymentManually, handlePayoutCallback, handleMoratoireVersementCallback } = require("../Controllers/paymentCallbackController");
+const { createMoratoireEngagement, getAllMoratoireEngagements, getMoratoireById, getMoratoireByUser, updateVersementMontant, initiateMoratoireVersement, updateMoratoireStatus, resendMoratoireContract, addVersementManuel } = require("../Controllers/MoratoireController");
 const { buyAction, buyActionWithDividends } = require("../Controllers/ActionController");
 const { bulkCreateUsersFromPDF, uploadPDF } = require("../utils/bulkCreateUsers");
 const { getAllTransactionsByUser, getAllTransactions, getTransactionsByProcess } = require("../Controllers/TransactionController");
@@ -96,10 +97,26 @@ router.post('/send-passwords-actionnaires', sendPasswordsToActionnaires);
 // Routes pour les invitations WhatsApp
 router.post('/send-whatsapp-invitations', adminRole, sendInvitations);
 router.post('/send-whatsapp-invitation/:userId', adminRole, sendInvitationToActionnaire);
-//router.post("/confirm", confirmPaymentManually);
+router.post("/confirm", confirmPaymentManually);
 
 // Routes pour le retrait de dividendes des actionnaires
 router.post("/actionnaire/withdraw/initiate", authenticateUser, initiateActionnaireWithdrawal);
 router.post("/actionnaire/withdraw/confirm", authenticateUser, confirmActionnaireWithdrawal);
+
+// Routes Moratoire - Admin
+router.post("/moratoire", adminRole, createMoratoireEngagement);
+router.get("/moratoire", adminRole, getAllMoratoireEngagements);
+router.get("/moratoire/:id", authenticateUser, getMoratoireById);
+router.put("/moratoire/:id/versement-montant", adminRole, updateVersementMontant);
+router.put("/moratoire/:id/status", adminRole, updateMoratoireStatus);
+router.post("/moratoire/:id/resend-contract", adminRole, resendMoratoireContract);
+router.post("/moratoire/:id/versement-manuel", adminRole, addVersementManuel);
+
+// Routes Moratoire - Actionnaire
+router.get("/moratoire/user/me", authenticateUser, getMoratoireByUser);
+router.post("/moratoire/versement/initiate", authenticateUser, initiateMoratoireVersement);
+
+// Callback PayDunya pour les versements moratoires
+router.post("/ipnmoratoire", paydunyaCallbackLimiter, verifyPaydunyaCallback, handleMoratoireVersementCallback);
 
 module.exports=router
