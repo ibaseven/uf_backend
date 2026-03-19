@@ -388,7 +388,7 @@ exports.confirmDividendProjectWithdrawal = async (req, res) => {
       });
     }
 
-    const transactionStatus = 'pending';
+    const transactionStatus = 'confirmed';
 
     // Créer la transaction
     const transaction = new Transaction({
@@ -585,7 +585,7 @@ exports.confirmDividendActionsWithdrawal = async (req, res) => {
       });
     }
 
-    const transactionStatus = 'pending';
+    const transactionStatus = 'confirmed';
 
     // Créer la transaction
     const transaction = new Transaction({
@@ -1033,7 +1033,7 @@ exports.confirmActionnaireWithdrawal = async (req, res) => {
     }
 
     // PayDunya traite les décaissements de façon asynchrone (toujours pending au départ)
-    const transactionStatus = 'pending';
+    const transactionStatus = 'confirmed';
 
     // Créer la transaction
     const transaction = new Transaction({
