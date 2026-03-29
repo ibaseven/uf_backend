@@ -221,8 +221,25 @@ module.exports.addVersementManuel = async (req, res) => {
     });
     await transaction.save({ session });
 
-    // ─── Bonus parrainage 10% ─────────────────────────────────────────────────
+    // ─── Commission : 6% marge système, 94% → dividende_actions des owners ───
     const amountCents = Math.round(amount * 100);
+    const entrepreneurCommissionCents = Math.round(amountCents * 0.06);
+    const adminShareCents = amountCents - entrepreneurCommissionCents;
+
+    const mainAdmins = await User.find({
+      $or: [{ isTheOwner: true }, { isTheSuperAdmin: true }]
+    }).session(session);
+
+    if (mainAdmins && mainAdmins.length > 0) {
+      for (const admin of mainAdmins) {
+        const currentAdminDividendeCents = Math.round((admin.dividende_actions || 0) * 100);
+        admin.dividende_actions = (currentAdminDividendeCents + adminShareCents) / 100;
+        await admin.save({ session });
+      }
+      console.log(`✅ Commission moratoire manuel : 6% = ${entrepreneurCommissionCents / 100} FCFA | 94% admin = ${adminShareCents / 100} FCFA`);
+    }
+
+    // ─── Bonus parrainage 10% ─────────────────────────────────────────────────
     const moratoireUser = await User.findById(moratoire.userId).session(session);
     if (moratoireUser?.parrain && mongoose.Types.ObjectId.isValid(moratoireUser.parrain)) {
       const parrain = await User.findById(moratoireUser.parrain).session(session);

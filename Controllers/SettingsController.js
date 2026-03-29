@@ -52,6 +52,7 @@ module.exports.getSettings = async (req, res) => {
     return res.status(200).json({
       actionsBlocked: settings?.actionsBlocked ?? false,
       projectsBlocked: settings?.projectsBlocked ?? false,
+      dividendsActionsBlocked: settings?.dividendsActionsBlocked ?? false,
       pricePerAction: settings?.pricePerAction ?? 2000
     });
   } catch (error) {
@@ -80,6 +81,32 @@ module.exports.toggleActionsBlock = async (req, res) => {
     });
   } catch (error) {
     console.error("Erreur toggleActionsBlock :", error);
+    return res.status(500).json({ message: "Erreur serveur" });
+  }
+};
+
+// Toggle block/unblock achat avec dividendes (isTheOwner only)
+module.exports.toggleDividendsActionsBlock = async (req, res) => {
+  try {
+    const caller = await User.findById(req.user.id);
+    if (!caller?.isTheOwner) {
+      return res.status(403).json({ message: "Accès refusé. Réservé au propriétaire." });
+    }
+
+    const settings = await Settings.findOneAndUpdate(
+      {},
+      [{ $set: { dividendsActionsBlocked: { $not: "$dividendsActionsBlocked" } } }],
+      { new: true, upsert: true }
+    );
+
+    return res.status(200).json({
+      message: settings.dividendsActionsBlocked
+        ? "Achat d'actions avec dividendes bloqué"
+        : "Achat d'actions avec dividendes débloqué",
+      dividendsActionsBlocked: settings.dividendsActionsBlocked
+    });
+  } catch (error) {
+    console.error("Erreur toggleDividendsActionsBlock :", error);
     return res.status(500).json({ message: "Erreur serveur" });
   }
 };

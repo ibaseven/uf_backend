@@ -689,6 +689,15 @@ module.exports.buyActionWithDividends = async (req, res) => {
             });
         }
 
+        // Vérifier si l'achat avec dividendes est bloqué
+        const blockCheck = await Settings.findOne().session(session);
+        if (blockCheck?.dividendsActionsBlocked) {
+            await session.abortTransaction();
+            return res.status(403).json({
+                message: "L'achat d'actions avec dividendes est temporairement suspendu."
+            });
+        }
+
         // Récupérer l'utilisateur
         const user = await User.findById(userId).session(session);
         if (!user) {
