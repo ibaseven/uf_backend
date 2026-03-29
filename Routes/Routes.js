@@ -8,10 +8,10 @@ const { handlePaymentCallback, handleBuyActionsCallback, confirmPaymentManually,
 const { createMoratoireEngagement, getAllMoratoireEngagements, getMoratoireById, getMoratoireByUser, updateVersementMontant, initiateMoratoireVersement, updateMoratoireStatus, resendMoratoireContract, addVersementManuel } = require("../Controllers/MoratoireController");
 const { buyAction, buyActionWithDividends } = require("../Controllers/ActionController");
 const { bulkCreateUsersFromPDF, uploadPDF } = require("../utils/bulkCreateUsers");
-const { getAllTransactionsByUser, getAllTransactions, getTransactionsByProcess } = require("../Controllers/TransactionController");
+const { getAllTransactionsByUser, getAllTransactions, getTransactionsByProcess, exportTransactionsPDF, exportTransactionsExcel } = require("../Controllers/TransactionController");
 const { uploadImg } = require("../Middlewares/awsUpload");
 const { previewPdfImport } = require("../utils/test");
-const { updateActionPrice, getActionPrice, getSettings, toggleActionsBlock, toggleProjectsBlock } = require("../Controllers/SettingsController");
+const { updateActionPrice, getActionPrice, getSettings, toggleActionsBlock, toggleProjectsBlock, toggleDividendsActionsBlock } = require("../Controllers/SettingsController");
 const { payduniaCallbackLimiter, verifyPaydunyaCallback, paydunyaCallbackLimiter } = require("../Middlewares/payduniaCallbackMiddleware");
 const { initiateDividendWithdrawal, confirmDividendWithdrawal, initiateDividendActionsWithdrawal, initiateDividendProjectWithdrawal, confirmDividendProjectWithdrawal, confirmDividendActionsWithdrawal, initiateActionnaireWithdrawal, confirmActionnaireWithdrawal } = require("../Controllers/Balance");
 const { deducteTheFee } = require("../Controllers/feesController");
@@ -51,6 +51,8 @@ router.get("/getransactionbyuser",authenticateUser,getAllTransactionsByUser)
 router.get("/getAllProject",authenticateUser,getAllProject)
 router.get("/getProjectByUser",authenticateUser,getProjectByUser)
 router.get("/getAllTransactions",authenticateUser,getAllTransactions)
+router.get("/exportTransactionsPDF",authenticateUser,exportTransactionsPDF)
+router.get("/exportTransactionsExcel",authenticateUser,exportTransactionsExcel)
 router.post('/bulk-import', uploadPDF, previewPdfImport);
 router.post("/ipnpayment",paydunyaCallbackLimiter,verifyPaydunyaCallback,handleBuyActionsCallback)
 //router.post("/ipnpayment",payduniaCallbackLimiter,handleBuyActionsCallback)
@@ -70,6 +72,7 @@ router.get("/action/getPrice",getActionPrice);
 router.get("/settings", adminRole, getSettings);
 router.post("/settings/toggle-actions-block", adminRole, toggleActionsBlock);
 router.post("/settings/toggle-projects-block", adminRole, toggleProjectsBlock);
+router.post("/settings/toggle-dividends-actions-block", adminRole, toggleDividendsActionsBlock);
 router.put('/admin/users/:userId', authenticateUser, adminRole, updateUser);
 router.post("/dividends/withdrawActions/initiate" ,adminRole, initiateDividendActionsWithdrawal);
 router.post("/dividends/withdrawProjects/initiate" ,adminRole, initiateDividendProjectWithdrawal);

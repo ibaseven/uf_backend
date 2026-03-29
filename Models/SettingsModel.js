@@ -11,6 +11,10 @@ const SettingsSchema = mongoose.Schema({
   projectsBlocked: {
     type: Boolean,
     default: false
+  },
+  dividendsActionsBlocked: {
+    type: Boolean,
+    default: false
   }
 });
 
